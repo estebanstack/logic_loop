@@ -1,0 +1,277 @@
+[gd_scene format=3 uid="uid://ccq7olhuh1arw"]
+
+[ext_resource type="Script" uid="uid://daf8d88kllw4b" path="res://Scripts/main.gd" id="1_main_script"]
+[ext_resource type="Script" uid="uid://ct7rphboagd8w" path="res://Scripts/npc.gd" id="2_npc_script"]
+[ext_resource type="Script" uid="uid://c3jjjyjubctqu" path="res://Scripts/spark.gd" id="3_spark_script"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_npc"]
+size = Vector2(40, 40)
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_vision"]
+radius = 250.0
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_spark"]
+size = Vector2(30, 30)
+
+[node name="Main" type="Node2D" unique_id=1209602406]
+script = ExtResource("1_main_script")
+
+[node name="MaintenanceBot" type="CharacterBody2D" parent="." unique_id=2099155344]
+position = Vector2(550, 320)
+script = ExtResource("2_npc_script")
+
+[node name="ColorRect" type="ColorRect" parent="MaintenanceBot" unique_id=1463291354]
+offset_left = -20.0
+offset_top = -20.0
+offset_right = 20.0
+offset_bottom = 20.0
+color = Color(0.2, 0.6, 1, 1)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="MaintenanceBot" unique_id=1084562660]
+shape = SubResource("RectangleShape2D_npc")
+
+[node name="VisionArea" type="Area2D" parent="MaintenanceBot" unique_id=2083224790]
+
+[node name="VisionCollisionShape" type="CollisionShape2D" parent="MaintenanceBot/VisionArea" unique_id=69048076]
+shape = SubResource("CircleShape2D_vision")
+
+[node name="StateLabel" type="Label" parent="MaintenanceBot" unique_id=193677412]
+offset_left = -60.0
+offset_top = -45.0
+offset_right = 60.0
+offset_bottom = -20.0
+text = "PATRULLA"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="BotLabel" type="Label" parent="MaintenanceBot" unique_id=228611191]
+offset_left = -80.0
+offset_top = 22.0
+offset_right = 80.0
+offset_bottom = 40.0
+theme_override_font_sizes/font_size = 11
+text = "Bot de Mantenimiento"
+horizontal_alignment = 1
+
+[node name="Spark" type="CharacterBody2D" parent="." unique_id=1807586699]
+position = Vector2(150, 600)
+script = ExtResource("3_spark_script")
+
+[node name="ColorRect" type="ColorRect" parent="Spark" unique_id=1447334383]
+offset_left = -15.0
+offset_top = -15.0
+offset_right = 15.0
+offset_bottom = 15.0
+color = Color(0.2, 0.9, 0.4, 1)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Spark" unique_id=1527645984]
+shape = SubResource("RectangleShape2D_spark")
+
+[node name="SparkLabel" type="Label" parent="Spark" unique_id=299436074]
+offset_left = -50.0
+offset_top = 18.0
+offset_right = 50.0
+offset_bottom = 34.0
+theme_override_font_sizes/font_size = 11
+text = "Spark (Dron)"
+horizontal_alignment = 1
+
+[node name="RepairComponent" type="Node2D" parent="." unique_id=1120720153]
+position = Vector2(700, 150)
+
+[node name="ColorRect" type="ColorRect" parent="RepairComponent" unique_id=204558450]
+offset_left = -18.0
+offset_top = -18.0
+offset_right = 18.0
+offset_bottom = 18.0
+color = Color(1, 0.4, 0.1, 1)
+
+[node name="ComponentLabel" type="Label" parent="RepairComponent" unique_id=422559587]
+offset_left = -90.0
+offset_top = 22.0
+offset_right = 90.0
+offset_bottom = 38.0
+theme_override_font_sizes/font_size = 11
+text = "Componente de Reparación"
+horizontal_alignment = 1
+
+[node name="UI" type="CanvasLayer" parent="." unique_id=96624360]
+
+[node name="DetectionTimer" type="Timer" parent="UI" unique_id=1835382785]
+one_shot = true
+
+[node name="DebugPanel" type="PanelContainer" parent="UI" unique_id=460082637]
+offset_left = 20.0
+offset_top = 20.0
+offset_right = 360.0
+offset_bottom = 200.0
+
+[node name="Margin" type="MarginContainer" parent="UI/DebugPanel" unique_id=105804545]
+layout_mode = 2
+
+[node name="VBox" type="VBoxContainer" parent="UI/DebugPanel/Margin" unique_id=214630802]
+layout_mode = 2
+
+[node name="AgentTitle" type="Label" parent="UI/DebugPanel/Margin/VBox" unique_id=2121041803]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.5, 0.85, 1, 1)
+theme_override_font_sizes/font_size = 13
+text = "ESTADO DEL AGENTE"
+
+[node name="StatusText" type="Label" parent="UI/DebugPanel/Margin/VBox" unique_id=1302799352]
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+text = "Estado:    PATRULLA
+Objetivo:  NO DETECTADO
+Distancia: N/A
+Acción:    ESPERANDO EJECUCIÓN
+Visión:    250 px"
+
+[node name="DetectionBanner" type="Label" parent="UI/DebugPanel/Margin/VBox" unique_id=2073061971]
+visible = false
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.85, 0.1, 1)
+theme_override_font_sizes/font_size = 12
+text = "[!] ¡SPARK DETECTADO!"
+horizontal_alignment = 1
+
+[node name="ProgrammingPanel" type="PanelContainer" parent="UI" unique_id=1140289537]
+offset_left = 800.0
+offset_top = 410.0
+offset_right = 1260.0
+offset_bottom = 700.0
+
+[node name="Margin" type="MarginContainer" parent="UI/ProgrammingPanel" unique_id=2110914487]
+layout_mode = 2
+
+[node name="VBox" type="VBoxContainer" parent="UI/ProgrammingPanel/Margin" unique_id=1741814650]
+layout_mode = 2
+
+[node name="ProgramTitle" type="Label" parent="UI/ProgrammingPanel/Margin/VBox" unique_id=1849796916]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.4, 1, 0.5, 1)
+theme_override_font_sizes/font_size = 13
+text = "PROGRAMA DE SPARK (LOGIC LOOP)"
+
+[node name="ScrollList" type="ScrollContainer" parent="UI/ProgrammingPanel/Margin/VBox" unique_id=1879962613]
+custom_minimum_size = Vector2(0, 110)
+layout_mode = 2
+
+[node name="ProgramList" type="Label" parent="UI/ProgrammingPanel/Margin/VBox/ScrollList" unique_id=2000461656]
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+text = "[ Vacío — añade comandos ]"
+
+[node name="CommandsTitle" type="Label" parent="UI/ProgrammingPanel/Margin/VBox" unique_id=2097839023]
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+text = "COMANDOS:"
+
+[node name="HBoxRow1" type="HBoxContainer" parent="UI/ProgrammingPanel/Margin/VBox" unique_id=526772138]
+layout_mode = 2
+
+[node name="BtnMove" type="Button" parent="UI/ProgrammingPanel/Margin/VBox/HBoxRow1" unique_id=812815572]
+layout_mode = 2
+text = " MOVER "
+
+[node name="BtnTurnLeft" type="Button" parent="UI/ProgrammingPanel/Margin/VBox/HBoxRow1" unique_id=1009321323]
+layout_mode = 2
+text = " GIRAR IZQ "
+
+[node name="BtnTurnRight" type="Button" parent="UI/ProgrammingPanel/Margin/VBox/HBoxRow1" unique_id=1134440165]
+layout_mode = 2
+text = " GIRAR DER "
+
+[node name="BtnInteract" type="Button" parent="UI/ProgrammingPanel/Margin/VBox/HBoxRow1" unique_id=579064236]
+layout_mode = 2
+text = " INTERACTUAR "
+
+[node name="HBoxRow2" type="HBoxContainer" parent="UI/ProgrammingPanel/Margin/VBox" unique_id=1835646305]
+layout_mode = 2
+
+[node name="BtnClear" type="Button" parent="UI/ProgrammingPanel/Margin/VBox/HBoxRow2" unique_id=391865236]
+layout_mode = 2
+text = " BORRAR TODO "
+
+[node name="BtnExecute" type="Button" parent="UI/ProgrammingPanel/Margin/VBox/HBoxRow2" unique_id=1955427396]
+layout_mode = 2
+text = " EJECUTAR "
+
+[node name="FeedbackText" type="Label" parent="UI/ProgrammingPanel/Margin/VBox" unique_id=961966090]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.85, 0.85, 0.85, 1)
+theme_override_font_sizes/font_size = 11
+text = "ESTADO: Listo para programar"
+
+[node name="GameOverModal" type="PanelContainer" parent="UI" unique_id=672476547]
+visible = false
+offset_left = 315.0
+offset_top = 240.0
+offset_right = 765.0
+offset_bottom = 440.0
+
+[node name="Margin" type="MarginContainer" parent="UI/GameOverModal" unique_id=940432820]
+layout_mode = 2
+
+[node name="VBox" type="VBoxContainer" parent="UI/GameOverModal/Margin" unique_id=1273613150]
+layout_mode = 2
+alignment = 1
+
+[node name="Title" type="Label" parent="UI/GameOverModal/Margin/VBox" unique_id=640219009]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.25, 0.25, 1)
+theme_override_font_sizes/font_size = 22
+text = "¡GAME OVER!"
+horizontal_alignment = 1
+
+[node name="Msg" type="Label" parent="UI/GameOverModal/Margin/VBox" unique_id=1667109737]
+layout_mode = 2
+theme_override_font_sizes/font_size = 13
+text = "Spark fue capturado por el Bot de Mantenimiento.
+Modifica tu programa e inténtalo de nuevo."
+horizontal_alignment = 1
+
+[node name="BtnRetry" type="Button" parent="UI/GameOverModal/Margin/VBox" unique_id=1971707084]
+layout_mode = 2
+text = " REINTENTAR "
+
+[node name="VictoryModal" type="PanelContainer" parent="UI" unique_id=875752066]
+visible = false
+offset_left = 315.0
+offset_top = 240.0
+offset_right = 765.0
+offset_bottom = 440.0
+
+[node name="Margin" type="MarginContainer" parent="UI/VictoryModal" unique_id=982245337]
+layout_mode = 2
+
+[node name="VBox" type="VBoxContainer" parent="UI/VictoryModal/Margin" unique_id=1674868351]
+layout_mode = 2
+alignment = 1
+
+[node name="Title" type="Label" parent="UI/VictoryModal/Margin/VBox" unique_id=589305456]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.2, 1, 0.4, 1)
+theme_override_font_sizes/font_size = 22
+text = "¡NIVEL COMPLETADO!"
+horizontal_alignment = 1
+
+[node name="Msg" type="Label" parent="UI/VictoryModal/Margin/VBox" unique_id=1063863121]
+layout_mode = 2
+theme_override_font_sizes/font_size = 13
+text = "¡Felicidades! Spark recolectó el Componente de Reparación sin ser detectado."
+horizontal_alignment = 1
+
+[node name="BtnReplay" type="Button" parent="UI/VictoryModal/Margin/VBox" unique_id=1552048646]
+layout_mode = 2
+text = " REJUGAR "
+
+[connection signal="timeout" from="UI/DetectionTimer" to="." method="_on_detection_timer_timeout"]
+[connection signal="pressed" from="UI/ProgrammingPanel/Margin/VBox/HBoxRow1/BtnMove" to="." method="_on_btn_move_pressed"]
+[connection signal="pressed" from="UI/ProgrammingPanel/Margin/VBox/HBoxRow1/BtnTurnLeft" to="." method="_on_btn_turn_left_pressed"]
+[connection signal="pressed" from="UI/ProgrammingPanel/Margin/VBox/HBoxRow1/BtnTurnRight" to="." method="_on_btn_turn_right_pressed"]
+[connection signal="pressed" from="UI/ProgrammingPanel/Margin/VBox/HBoxRow1/BtnInteract" to="." method="_on_btn_interact_pressed"]
+[connection signal="pressed" from="UI/ProgrammingPanel/Margin/VBox/HBoxRow2/BtnClear" to="." method="_on_btn_clear_pressed"]
+[connection signal="pressed" from="UI/ProgrammingPanel/Margin/VBox/HBoxRow2/BtnExecute" to="." method="_on_btn_execute_pressed"]
+[connection signal="pressed" from="UI/GameOverModal/Margin/VBox/BtnRetry" to="." method="_on_btn_retry_pressed"]
+[connection signal="pressed" from="UI/VictoryModal/Margin/VBox/BtnReplay" to="." method="_on_btn_replay_pressed"]
