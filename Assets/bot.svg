@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <!-- Orugas / Ruedas laterales industriales -->
+  <rect x="6" y="10" width="10" height="44" rx="3" fill="#0f172a" stroke="#334155" stroke-width="2"/>
+  <rect x="48" y="10" width="10" height="44" rx="3" fill="#0f172a" stroke="#334155" stroke-width="2"/>
+  <line x1="6" y1="20" x2="16" y2="20" stroke="#475569" stroke-width="1.5"/>
+  <line x1="6" y1="32" x2="16" y2="32" stroke="#475569" stroke-width="1.5"/>
+  <line x1="6" y1="44" x2="16" y2="44" stroke="#475569" stroke-width="1.5"/>
+  <line x1="48" y1="20" x2="58" y2="20" stroke="#475569" stroke-width="1.5"/>
+  <line x1="48" y1="32" x2="58" y2="32" stroke="#475569" stroke-width="1.5"/>
+  <line x1="48" y1="44" x2="58" y2="44" stroke="#475569" stroke-width="1.5"/>
+
+  <!-- Chasis central angular blindado -->
+  <polygon points="18,14 46,14 50,50 14,50" fill="#1e293b" stroke="#3b82f6" stroke-width="2.5"/>
+
+  <!-- Placa frontal de advertencia (franjas ámbar) -->
+  <rect x="22" y="38" width="20" height="7" fill="#f59e0b"/>
+  <line x1="26" y1="38" x2="23" y2="45" stroke="#0f172a" stroke-width="2"/>
+  <line x1="32" y1="38" x2="29" y2="45" stroke="#0f172a" stroke-width="2"/>
+  <line x1="38" y1="38" x2="35" y2="45" stroke="#0f172a" stroke-width="2"/>
+
+  <!-- Visor óptico de escaneo / Detección IA -->
+  <rect x="20" y="20" width="24" height="10" rx="3" fill="#1e1b4b" stroke="#60a5fa" stroke-width="1.5"/>
+  <circle cx="32" cy="25" r="3.5" fill="#ef4444"/>
+  <circle cx="33" cy="24" r="1.2" fill="#ffffff"/>
+  <line x1="22" y1="25" x2="42" y2="25" stroke="#f87171" stroke-width="1" stroke-dasharray="2 2"/>
+
+  <!-- Antena de comunicaciones de patrulla -->
+  <line x1="32" y1="14" x2="32" y2="6" stroke="#94a3b8" stroke-width="2"/>
+  <circle cx="32" cy="5" r="2.5" fill="#60a5fa"/>
+</svg>

@@ -2,23 +2,29 @@ extends Node2D
 
 # ENTORNO DE LA ESTACIÓN ESPACIAL (LOGIC LOOP)
 # Main actúa como la autoridad del entorno conectando:
-# - SPARK            → Agente programado por el jugador
-# - BOT DE MANTENIMIENTO → Agente autónomo / Obstáculo
+# - SPARK            → Agente programado por el jugador (Sistemas Dinámicos: Batería)
+# - BOT DE MANTENIMIENTO → Agente autónomo / Obstáculo (Agentes: FSM)
+# - BAHÍA LOGÍSTICA  → Dispensador de herramientas (Eventos Discretos: M/M/1/K)
 # - COMPONENTE DE REPARACIÓN → Objetivo ambiental
-
 
 @onready var maintenance_bot: Node2D  = get_node_or_null("MaintenanceBot")
 @onready var spark: Node2D            = get_node_or_null("Spark")
 @onready var repair_component: Node2D = get_node_or_null("RepairComponent")
+@onready var tool_dispenser: Node2D   = get_node_or_null("ToolDispenser")
 
 # UI NODES
-@onready var agent_status_label: Label   = get_node_or_null("UI/DebugPanel/Margin/VBox/StatusText")
-@onready var detection_banner: Label     = get_node_or_null("UI/DebugPanel/Margin/VBox/DetectionBanner")
-@onready var program_list: Label         = get_node_or_null("UI/ProgrammingPanel/Margin/VBox/ScrollList/ProgramList")
-@onready var feedback_label: Label       = get_node_or_null("UI/ProgrammingPanel/Margin/VBox/FeedbackText")
-@onready var game_over_modal: Control    = get_node_or_null("UI/GameOverModal")
-@onready var victory_modal: Control      = get_node_or_null("UI/VictoryModal")
-@onready var detection_timer: Timer      = get_node_or_null("UI/DetectionTimer")
+@onready var agent_status_label: Label     = get_node_or_null("UI/DebugPanel/Margin/VBox/StatusText")
+@onready var detection_banner: Label       = get_node_or_null("UI/DebugPanel/Margin/VBox/DetectionBanner")
+@onready var program_list: Label           = get_node_or_null("UI/ProgrammingPanel/Margin/VBox/ScrollList/ProgramList")
+@onready var feedback_label: Label         = get_node_or_null("UI/ProgrammingPanel/Margin/VBox/FeedbackText")
+@onready var game_over_modal: Control      = get_node_or_null("UI/GameOverModal")
+@onready var victory_modal: Control        = get_node_or_null("UI/VictoryModal")
+@onready var detection_timer: Timer        = get_node_or_null("UI/DetectionTimer")
+
+# Nodos de Sistemas Dinámicos y Eventos Discretos
+@onready var dynamics_status_label: Label  = get_node_or_null("UI/DynamicsPanel/Margin/VBox/DynamicsText")
+@onready var energy_bar: ProgressBar       = get_node_or_null("UI/DynamicsPanel/Margin/VBox/EnergyBar")
+@onready var queue_simulator: Control      = get_node_or_null("UI/QueueSimulator")
 
 # Rutas de patrulla en la estación espacial para el Bot de Mantenimiento
 @export var station_patrol_waypoints: Array[Vector2] = [
@@ -54,22 +60,61 @@ func get_environment_info() -> Dictionary:
 
 # INTERACCIÓN
 func check_interact(spark_pos: Vector2) -> void:
-	if not repair_component or not repair_component.visible or is_level_completed:
+	# 1. INTERACCIÓN CON EL DISPENSADOR LOGÍSTICO (RECOGER HERRAMIENTA)
+	if tool_dispenser and spark_pos.distance_to(tool_dispenser.global_position) <= 80.0:
+		if spark and spark.get("has_tool") == true:
+			notify_execution_status("Ya llevas una herramienta equipada")
+			return
+		if queue_simulator and queue_simulator.has_method("consume_tool"):
+			if queue_simulator.consume_tool():
+				if spark and spark.has_method("set_has_tool"):
+					spark.set_has_tool(true)
+				notify_execution_status("¡HERRAMIENTA RECOGIDA! Llévala al componente")
+			else:
+				notify_execution_status("¡ESPERANDO SUMINISTROS! La cola está vacía")
 		return
-	if spark_pos.distance_to(repair_component.global_position) <= 80.0:
-		is_level_completed    = true
-		repair_component.visible = false
-		is_simulation_running = false
-		notify_execution_status("¡COMPONENTE DE REPARACIÓN RECOLECTADO!")
-		if victory_modal: victory_modal.visible = true
-	else:
-		notify_execution_status("Demasiado lejos del componente")
 
-# GAME OVER
+	# 2. INTERACCIÓN CON EL COMPONENTE DE REPARACIÓN (REPARAR ESTACIÓN)
+	if repair_component and repair_component.visible and not is_level_completed:
+		if spark_pos.distance_to(repair_component.global_position) <= 80.0:
+			if spark and spark.get("has_tool") != true:
+				notify_execution_status("¡FALTA HERRAMIENTA! Recógela primero en el dispensador")
+				return
+
+			is_level_completed = true
+			repair_component.visible = false
+			is_simulation_running = false
+			if spark and spark.has_method("set_has_tool"):
+				spark.set_has_tool(false)
+			notify_execution_status("¡ESTACIÓN REPARADA CON ÉXITO!")
+			if victory_modal: victory_modal.visible = true
+			return
+
+	notify_execution_status("No hay nada con qué interactuar aquí")
+
+# GAME OVER POR CAPTURA
 func reset_spark() -> void:
 	is_simulation_running = false
 	notify_execution_status("¡SPARK FUE CAPTURADO!")
-	if game_over_modal: game_over_modal.visible = true
+	if game_over_modal:
+		var msg = game_over_modal.get_node_or_null("Margin/VBox/Msg")
+		if msg:
+			msg.text = "Spark fue capturado por el Bot de Mantenimiento.\nModifica tu programa e inténtalo de nuevo."
+		game_over_modal.visible = true
+	if spark and spark.has_method("reset_to_start"):
+		spark.reset_to_start()
+	if maintenance_bot and maintenance_bot.has_method("reset_to_start"):
+		maintenance_bot.reset_to_start()
+
+# GAME OVER POR SISTEMA DINÁMICO (BATERÍA AGOTADA)
+func on_battery_depleted() -> void:
+	is_simulation_running = false
+	notify_execution_status("¡BATERÍA AGOTADA!")
+	if game_over_modal:
+		var msg = game_over_modal.get_node_or_null("Margin/VBox/Msg")
+		if msg:
+			msg.text = "Spark se quedó sin energía en la batería.\nOptimiza tu programa para consumir menos instrucciones."
+		game_over_modal.visible = true
 	if spark and spark.has_method("reset_to_start"):
 		spark.reset_to_start()
 	if maintenance_bot and maintenance_bot.has_method("reset_to_start"):
@@ -95,7 +140,6 @@ func notify_spark_lost() -> void:
 
 func _on_detection_timer_timeout() -> void:
 	if detection_banner: detection_banner.visible = false
-
 
 # CONTROL DE SIMULACIÓN
 func start_simulation() -> void:
@@ -143,9 +187,10 @@ func _on_btn_replay_pressed() -> void:
 	if victory_modal: victory_modal.visible = false
 	is_level_completed = false
 	if repair_component: repair_component.visible = true
+	if queue_simulator and queue_simulator.has_method("reset_queue"):
+		queue_simulator.reset_queue()
 	reset_simulation()
 	notify_execution_status("Listo para programar")
-
 
 # ACTUALIZACIÓN DE LA UI
 func update_program_sequence_ui(commands: Array, current_idx: int, executing: bool) -> void:
@@ -183,6 +228,15 @@ func update_debug_ui(state_str: String, target_str: String, distance_str: String
 		agent_status_label.text = (
 			"Estado:    %s\nObjetivo:  %s\nDistancia: %s\nAcción:    %s\nVisión:    %d px"
 			% [state_str, target_str, distance_str, action_str, int(vision_radius)]
+		)
+
+func update_dynamics_ui(energy: float, max_energy: float, net_rate: float, inflow: float, outflow: float) -> void:
+	if energy_bar:
+		energy_bar.value = (energy / max_energy) * 100.0
+	if dynamics_status_label:
+		dynamics_status_label.text = (
+			"Stock (Energía): %.1f %%\nInflow (Solar):   +%.1f %%/s\nOutflow (Base):   -%.1f %%/s\nTasa Neta dE/dt:  %+.1f %%/s\nBucle: Balance continuo"
+			% [energy, inflow, outflow, net_rate]
 		)
 
 func _cmd_label(cmd: String) -> String:

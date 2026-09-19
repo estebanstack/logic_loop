@@ -2,42 +2,42 @@
 
 [ext_resource type="Script" uid="uid://c8jlyvsx1am5p" path="res://Scripts/queue_simulator.gd" id="1_tarlo"]
 
-[node name="QueueSimulator" type="Control" unique_id=1632582646]
-layout_mode = 3
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = 32.0
-offset_top = 177.0
-offset_right = 32.0
-offset_bottom = 177.0
-grow_horizontal = 2
-grow_vertical = 2
+[node name="QueueSimulator" type="PanelContainer"]
+custom_minimum_size = Vector2(420, 95)
+offset_right = 440.0
+offset_bottom = 95.0
 script = ExtResource("1_tarlo")
 
-[node name="ConveyorBelt" type="HBoxContainer" parent="." unique_id=22201724]
-layout_mode = 1
-anchors_preset = -1
-anchor_left = 0.032
-anchor_right = 0.032
-offset_left = 59.039997
-offset_top = 300.0
-offset_right = 350.04
-offset_bottom = 524.0
-theme_override_constants/separation = 10
+[node name="Margin" type="MarginContainer" parent="."]
+layout_mode = 2
+theme_override_constants/margin_left = 8
+theme_override_constants/margin_top = 6
+theme_override_constants/margin_right = 8
+theme_override_constants/margin_bottom = 6
 
-[node name="StatusLabel" type="Label" parent="." unique_id=994376080]
-layout_mode = 0
-offset_left = 100.0
-offset_top = 100.0
-offset_right = 248.0
-offset_bottom = 206.0
-theme_override_colors/font_color = Color(1, 1, 1, 1)
-theme_override_font_sizes/font_size = 32
+[node name="VBox" type="VBoxContainer" parent="Margin"]
+layout_mode = 2
+theme_override_constants/separation = 4
 
-[node name="ArrivalTimer" type="Timer" parent="." unique_id=56773361]
+[node name="HeaderLabel" type="Label" parent="Margin/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.75, 0.3, 1)
+theme_override_font_sizes/font_size = 12
+text = "BAHÍA LOGÍSTICA (EVENTOS DISCRETOS M/M/1/K)"
 
-[node name="ServiceTimer" type="Timer" parent="." unique_id=98754522]
+[node name="StatusLabel" type="Label" parent="Margin/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+text = "Cola de Herramientas: 0 / 8 | Llegadas: 0 | Servidas: 0"
+
+[node name="ConveyorBelt" type="HBoxContainer" parent="Margin/VBox"]
+custom_minimum_size = Vector2(0, 36)
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="ArrivalTimer" type="Timer" parent="."]
+
+[node name="ServiceTimer" type="Timer" parent="."]
 
 [connection signal="timeout" from="ArrivalTimer" to="." method="_on_arrival_timer_timeout"]
 [connection signal="timeout" from="ServiceTimer" to="." method="_on_service_timer_timeout"]

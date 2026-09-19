@@ -196,6 +196,31 @@ sequenceDiagram
     end
             </div>
         </div>
+
+        <!-- DIAGRAMA 5 -->
+        <div class="card">
+            <h2>5. Paradigma 2: Simulación de Eventos Discretos (DES — M/M/1/K)</h2>
+            <p>Bahía logística de herramientas: Llegadas y despachos en instantes discretos de tiempo (t_k) sobre una cola FIFO finita (K = 8).</p>
+            <div class="mermaid">
+graph LR
+    Generator["Fuente de Suministros (Estación)"] -->|"1. Evento de Llegada (ArrivalTimer)"| Queue["Cola FIFO (ConveyorBelt max K=8)"]
+    Queue -->|"2. Evento de Servicio (ServiceTimer)"| Processor["Bahía de Despacho / Uso"]
+    SparkAction["Spark: INTERACTUAR"] -->|"3. Consumo discreto de herramienta"| Queue
+    Queue -.->|"Si buffer >= 8 -> Evento Bloqueo"| Overflow["Saturación de Buffer"]
+            </div>
+        </div>
+
+        <!-- DIAGRAMA 6 -->
+        <div class="card">
+            <h2>6. Paradigma 3: Sistemas Dinámicos (Stock & Flow de Forrester)</h2>
+            <p>Dinámica continua de batería: acumulación de energía con bucle de balance e integración continua de Euler (dE/dt = Inflow - Outflow).</p>
+            <div class="mermaid">
+graph TD
+    Sun["Paneles Solares"] -->|"Inflow: +1.0 %/s (Recarga Solar)"| Stock["STOCK: BATERÍA DE SPARK E(t)"]
+    Stock -->|"Outflow: -1.5 %/s (Base) + Motores (-4 %/paso)"| Drain["Consumo y Fricción de Motores"]
+    Stock -.->|"Bucle de Balance: Si E <= 0 -> Falla"| GameOver["Game Over: Batería Agotada"]
+            </div>
+        </div>
     </div>
 
     <script>

@@ -3,6 +3,11 @@
 [ext_resource type="Script" uid="uid://daf8d88kllw4b" path="res://Scripts/main.gd" id="1_main_script"]
 [ext_resource type="Script" uid="uid://ct7rphboagd8w" path="res://Scripts/npc.gd" id="2_npc_script"]
 [ext_resource type="Script" uid="uid://c3jjjyjubctqu" path="res://Scripts/spark.gd" id="3_spark_script"]
+[ext_resource type="Texture2D" path="res://Assets/bot.svg" id="4_bot_tex"]
+[ext_resource type="Texture2D" path="res://Assets/spark.svg" id="5_spark_tex"]
+[ext_resource type="Texture2D" path="res://Assets/repair_component.svg" id="6_repair_tex"]
+[ext_resource type="PackedScene" uid="uid://i7f3v5edg7ay" path="res://Scenes/queue_simulator.tscn" id="7_queue_sim"]
+[ext_resource type="Texture2D" path="res://Assets/crate.svg" id="8_crate_tex"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_npc"]
 size = Vector2(40, 40)
@@ -20,12 +25,9 @@ script = ExtResource("1_main_script")
 position = Vector2(550, 320)
 script = ExtResource("2_npc_script")
 
-[node name="ColorRect" type="ColorRect" parent="MaintenanceBot" unique_id=1463291354]
-offset_left = -20.0
-offset_top = -20.0
-offset_right = 20.0
-offset_bottom = 20.0
-color = Color(0.2, 0.6, 1, 1)
+[node name="Sprite2D" type="Sprite2D" parent="MaintenanceBot"]
+scale = Vector2(0.65, 0.65)
+texture = ExtResource("4_bot_tex")
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="MaintenanceBot" unique_id=1084562660]
 shape = SubResource("RectangleShape2D_npc")
@@ -57,12 +59,15 @@ horizontal_alignment = 1
 position = Vector2(150, 600)
 script = ExtResource("3_spark_script")
 
-[node name="ColorRect" type="ColorRect" parent="Spark" unique_id=1447334383]
-offset_left = -15.0
-offset_top = -15.0
-offset_right = 15.0
-offset_bottom = 15.0
-color = Color(0.2, 0.9, 0.4, 1)
+[node name="Sprite2D" type="Sprite2D" parent="Spark"]
+scale = Vector2(0.55, 0.55)
+texture = ExtResource("5_spark_tex")
+
+[node name="ToolSprite" type="Sprite2D" parent="Spark"]
+visible = false
+position = Vector2(0, -22)
+scale = Vector2(0.35, 0.35)
+texture = ExtResource("8_crate_tex")
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Spark" unique_id=1527645984]
 shape = SubResource("RectangleShape2D_spark")
@@ -76,21 +81,35 @@ theme_override_font_sizes/font_size = 11
 text = "Spark (Dron)"
 horizontal_alignment = 1
 
+[node name="ToolDispenser" type="Node2D" parent="." unique_id=2083948123]
+position = Vector2(250, 420)
+
+[node name="Sprite2D" type="Sprite2D" parent="ToolDispenser"]
+scale = Vector2(0.7, 0.7)
+texture = ExtResource("8_crate_tex")
+
+[node name="DispenserLabel" type="Label" parent="ToolDispenser" unique_id=1492039182]
+offset_left = -80.0
+offset_top = 22.0
+offset_right = 80.0
+offset_bottom = 38.0
+theme_override_colors/font_color = Color(1, 0.75, 0.3, 1)
+theme_override_font_sizes/font_size = 11
+text = "Dispensador Logístico"
+horizontal_alignment = 1
+
 [node name="RepairComponent" type="Node2D" parent="." unique_id=1120720153]
 position = Vector2(700, 150)
 
-[node name="ColorRect" type="ColorRect" parent="RepairComponent" unique_id=204558450]
-offset_left = -18.0
-offset_top = -18.0
-offset_right = 18.0
-offset_bottom = 18.0
-color = Color(1, 0.4, 0.1, 1)
+[node name="Sprite2D" type="Sprite2D" parent="RepairComponent"]
+scale = Vector2(0.65, 0.65)
+texture = ExtResource("6_repair_tex")
 
 [node name="ComponentLabel" type="Label" parent="RepairComponent" unique_id=422559587]
 offset_left = -90.0
-offset_top = 22.0
+offset_top = 24.0
 offset_right = 90.0
-offset_bottom = 38.0
+offset_bottom = 40.0
 theme_override_font_sizes/font_size = 11
 text = "Componente de Reparación"
 horizontal_alignment = 1
@@ -116,7 +135,7 @@ layout_mode = 2
 layout_mode = 2
 theme_override_colors/font_color = Color(0.5, 0.85, 1, 1)
 theme_override_font_sizes/font_size = 13
-text = "ESTADO DEL AGENTE"
+text = "PARADIGMA 1: AGENTES (FSM & VISIÓN)"
 
 [node name="StatusText" type="Label" parent="UI/DebugPanel/Margin/VBox" unique_id=1302799352]
 layout_mode = 2
@@ -134,6 +153,45 @@ theme_override_colors/font_color = Color(1, 0.85, 0.1, 1)
 theme_override_font_sizes/font_size = 12
 text = "[!] ¡SPARK DETECTADO!"
 horizontal_alignment = 1
+
+[node name="DynamicsPanel" type="PanelContainer" parent="UI" unique_id=1587421390]
+offset_left = 20.0
+offset_top = 215.0
+offset_right = 360.0
+offset_bottom = 365.0
+
+[node name="Margin" type="MarginContainer" parent="UI/DynamicsPanel"]
+layout_mode = 2
+
+[node name="VBox" type="VBoxContainer" parent="UI/DynamicsPanel/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="DynamicsTitle" type="Label" parent="UI/DynamicsPanel/Margin/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.3, 0.95, 0.6, 1)
+theme_override_font_sizes/font_size = 13
+text = "PARADIGMA 3: SISTEMAS DINÁMICOS"
+
+[node name="EnergyBar" type="ProgressBar" parent="UI/DynamicsPanel/Margin/VBox"]
+custom_minimum_size = Vector2(0, 16)
+layout_mode = 2
+value = 100.0
+
+[node name="DynamicsText" type="Label" parent="UI/DynamicsPanel/Margin/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+text = "Stock (Energía): 100.0 %
+Inflow (Solar):   +1.0 %/s
+Outflow (Base):   -1.5 %/s
+Tasa Neta dE/dt:  -0.5 %/s
+Bucle: Balance continuo"
+
+[node name="QueueSimulator" parent="UI" instance=ExtResource("7_queue_sim")]
+offset_left = 380.0
+offset_top = 20.0
+offset_right = 820.0
+offset_bottom = 120.0
 
 [node name="ProgrammingPanel" type="PanelContainer" parent="UI" unique_id=1140289537]
 offset_left = 800.0
