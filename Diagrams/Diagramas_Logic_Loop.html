@@ -221,6 +221,70 @@ graph TD
     Stock -.->|"Bucle de Balance: Si E <= 0 -> Falla"| GameOver["Game Over: Batería Agotada"]
             </div>
         </div>
+
+        <!-- DIAGRAMA 7 -->
+        <div class="card">
+            <h2>7. Paradigma 4: Cadenas de Markov (Clima Espacial y Radiación)</h2>
+            <p>Proceso estocástico en tiempo discreto: transiciones de probabilidad entre estados de radiación de la estación (Estable, Fluctuante, Crítico) con matriz P y distribución estacionaria π.</p>
+            <div class="mermaid">
+stateDiagram-v2
+    direction LR
+
+    ESTABLE --> ESTABLE : P = 0.70
+    ESTABLE --> FLUCTUANTE : P = 0.25
+    ESTABLE --> CRÍTICO : P = 0.05
+    
+    FLUCTUANTE --> ESTABLE : P = 0.30
+    FLUCTUANTE --> FLUCTUANTE : P = 0.50
+    FLUCTUANTE --> CRÍTICO : P = 0.20
+    
+    CRÍTICO --> ESTABLE : P = 0.15
+    CRÍTICO --> FLUCTUANTE : P = 0.35
+    CRÍTICO --> CRÍTICO : P = 0.50
+            </div>
+        </div>
+
+        <!-- DIAGRAMA 8 -->
+        <div class="card">
+            <h2>8. Paradigma 5: Modelos Ocultos de Markov (HMM — Diagnóstico Latente)</h2>
+            <p>Tupla λ = (A, B, π0) para inferir el desgaste latente del núcleo a partir de telemetría de sensores, resuelto mediante el Algoritmo de Viterbi y filtrado de creencia Forward.</p>
+            <div class="mermaid">
+graph TD
+    subgraph HiddenStates ["Estados Ocultos (Salud Latente)"]
+        H0["Óptimo"]
+        H1["Degradado"]
+        H2["Crítico"]
+        H0 -->|"A[0,1]=0.20"| H1
+        H1 -->|"A[1,2]=0.20"| H2
+    end
+    subgraph Observations ["Telemetría Observable"]
+        O0["Verde (Nominal)"]
+        O1["Amarillo (Vibración)"]
+        O2["Rojo (Alarma)"]
+    end
+    H0 -.->|"B[0,0]=0.70"| O0
+    H1 -.->|"B[1,1]=0.60"| O1
+    H2 -.->|"B[2,2]=0.70"| O2
+    subgraph Decode ["Algoritmos"]
+        Vit["Decodificación de Viterbi: Trayectoria Más Probable"]
+        Fwd["Filtrado Forward: Creencia P(X_t | Y_{1:t})"]
+    end
+            </div>
+        </div>
+
+        <!-- DIAGRAMA 9 -->
+        <div class="card">
+            <h2>9. Paradigma 6: Teoría de Juegos (Spark vs Bot de Mantenimiento)</h2>
+            <p>Interacción estratégica bimatriz 2x2: análisis de equilibrios de Nash puros y mixtos (p*, q*), dominancia y consecuencias en recursos en tiempo real.</p>
+            <div class="mermaid">
+graph LR
+    P1["Spark: {Cauto, Audaz}"] --> Matrix["Matriz de Pagos 2x2 (Halcón-Paloma / Prisionero)"]
+    P2["Bot: {Patrulla, Escaneo}"] --> Matrix
+    Matrix --> PureNash["Equilibrios Puros: (Cauto, Escaneo) y (Audaz, Patrulla)"]
+    Matrix --> MixedNash["Equilibrio Mixto: p*=50%, q*=50% | E[U]=(2.0, 2.0)"]
+    Matrix --> Gameplay["Efecto en Juego: Eficiencia de Energía vs Radio de Detección"]
+            </div>
+        </div>
     </div>
 
     <script>

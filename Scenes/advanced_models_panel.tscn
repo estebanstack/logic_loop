@@ -1,0 +1,167 @@
+[gd_scene format=3 uid="uid://dxj3q815m2p1y"]
+
+[ext_resource type="Script" uid="uid://bq8s27k4lx93y" path="res://Scripts/advanced_models_panel.gd" id="1_panel_script"]
+
+[node name="AdvancedModelsPanel" type="PanelContainer"]
+custom_minimum_size = Vector2(450, 365)
+offset_right = 450.0
+offset_bottom = 365.0
+script = ExtResource("1_panel_script")
+
+[node name="Margin" type="MarginContainer" parent="."]
+layout_mode = 2
+theme_override_constants/margin_left = 8
+theme_override_constants/margin_top = 6
+theme_override_constants/margin_right = 8
+theme_override_constants/margin_bottom = 6
+
+[node name="VBox" type="VBoxContainer" parent="Margin"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="HeaderTitle" type="Label" parent="Margin/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.9, 0.7, 1, 1)
+theme_override_font_sizes/font_size = 12
+text = "MODELOS AVANZADOS (MARKOV · HMM · TEORÍA DE JUEGOS)"
+horizontal_alignment = 1
+
+[node name="TabContainer" type="TabContainer" parent="Margin/VBox"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_font_sizes/font_size = 11
+
+[node name="MarkovTab" type="VBoxContainer" parent="Margin/VBox/TabContainer"]
+layout_mode = 2
+theme_override_constants/separation = 4
+metadata/_tab_index = 0
+
+[node name="StateLabel" type="Label" parent="Margin/VBox/TabContainer/MarkovTab"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.35, 1, 0.55, 1)
+theme_override_font_sizes/font_size = 12
+text = "Estado Estación: ESTABLE [S_0]"
+
+[node name="MatrixLabel" type="Label" parent="Margin/VBox/TabContainer/MarkovTab"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 10
+text = "Matriz P (Transición):
+  EST: [0.70, 0.25, 0.05]
+  FLU: [0.30, 0.50, 0.20]
+  CRÍ: [0.15, 0.35, 0.50]"
+
+[node name="DistLabel" type="Label" parent="Margin/VBox/TabContainer/MarkovTab"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 10
+text = "π Teórico: [45.3%, 35.8%, 18.9%]
+f Empírico: [100.0%, 0.0%, 0.0%] (N=1)"
+
+[node name="EffectLabel" type="Label" parent="Margin/VBox/TabContainer/MarkovTab"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.4, 0.85, 1, 1)
+theme_override_font_sizes/font_size = 10
+text = "Efecto: Recarga Solar x1.0 | Alerta Bot x1.0"
+
+[node name="HBox" type="HBoxContainer" parent="Margin/VBox/TabContainer/MarkovTab"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="BtnMarkovStep" type="Button" parent="Margin/VBox/TabContainer/MarkovTab/HBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+text = " PASO MARKOV "
+
+[node name="BtnMarkovAuto" type="Button" parent="Margin/VBox/TabContainer/MarkovTab/HBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+text = " AUTO: OFF "
+
+[node name="HMMTab" type="VBoxContainer" parent="Margin/VBox/TabContainer"]
+visible = false
+layout_mode = 2
+theme_override_constants/separation = 4
+metadata/_tab_index = 1
+
+[node name="HiddenStateLabel" type="Label" parent="Margin/VBox/TabContainer/HMMTab"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.55, 0.35, 1)
+theme_override_font_sizes/font_size = 11
+text = "Desgaste Oculto Real: [ ÓPTIMO ]"
+
+[node name="ObsLabel" type="Label" parent="Margin/VBox/TabContainer/HMMTab"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+text = "Sensor Telemetría:    [ VERDE (Nominal) ]"
+
+[node name="BeliefLabel" type="Label" parent="Margin/VBox/TabContainer/HMMTab"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.4, 0.9, 1, 1)
+theme_override_font_sizes/font_size = 10
+text = "Creencia Forward P(X_t|Y):
+  Óptimo: 70.0%  |  Degradado: 20.0%  |  Crítico: 10.0%"
+
+[node name="ViterbiLabel" type="Label" parent="Margin/VBox/TabContainer/HMMTab"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 10
+text = "Viterbi: Esperando pulsos de telemetría..."
+
+[node name="HBox" type="HBoxContainer" parent="Margin/VBox/TabContainer/HMMTab"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="BtnHMMPulse" type="Button" parent="Margin/VBox/TabContainer/HMMTab/HBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+text = " PULSO TELEMETRÍA "
+
+[node name="BtnHMMReset" type="Button" parent="Margin/VBox/TabContainer/HMMTab/HBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+text = " REINICIAR "
+
+[node name="GameTheoryTab" type="VBoxContainer" parent="Margin/VBox/TabContainer"]
+visible = false
+layout_mode = 2
+theme_override_constants/separation = 4
+metadata/_tab_index = 2
+
+[node name="HBoxPreset" type="HBoxContainer" parent="Margin/VBox/TabContainer/GameTheoryTab"]
+layout_mode = 2
+
+[node name="BtnPreset" type="Button" parent="Margin/VBox/TabContainer/GameTheoryTab/HBoxPreset"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+text = "Preset: Halcón y Paloma"
+
+[node name="MatrixLabel" type="Label" parent="Margin/VBox/TabContainer/GameTheoryTab"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 10
+text = "Bimatriz (Spark, Bot):
+  CAUTO: [PATRU: (3,3) | ESCAN: (1,4)]
+  AUDAZ: [PATRU: (4,1) | ESCAN: (0,0)]"
+
+[node name="NashLabel" type="Label" parent="Margin/VBox/TabContainer/GameTheoryTab"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.85, 0.35, 1)
+theme_override_font_sizes/font_size = 10
+text = "Nash Puro: (CAUTO, ESCAN) y (AUDAZ, PATRU)
+Mixto: p*=50%, q*=50% | E[U]=(2.0, 2.0)"
+
+[node name="HBoxAction" type="HBoxContainer" parent="Margin/VBox/TabContainer/GameTheoryTab"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="BtnSparkStrategy" type="Button" parent="Margin/VBox/TabContainer/GameTheoryTab/HBoxAction"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+text = "Spark: CAUTO"
+
+[node name="BtnPlayRound" type="Button" parent="Margin/VBox/TabContainer/GameTheoryTab/HBoxAction"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+text = " RESOLVER ENCUENTRO "
+
+[node name="ScoreLabel" type="Label" parent="Margin/VBox/TabContainer/GameTheoryTab"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 10
+text = "Sin rondas jugadas | Marcador: Spark 0 - 0 Bot"

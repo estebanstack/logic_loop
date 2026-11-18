@@ -88,3 +88,88 @@ sequenceDiagram
         Spark->>Main: check_interact() -> Muestra Modal de ¡NIVEL COMPLETADO!
     end
 ```
+
+## 4. Paradigma 4: Cadenas de Markov (Clima Espacial y Radiación)
+
+Proceso estocástico en tiempo discreto $\{X_t, t \ge 0\}$ con propiedad de Markov sobre el espacio de estados $S = \{\text{ESTABLE}, \text{FLUCTUANTE}, \text{CRÍTICO}\}$.
+
+```mermaid
+stateDiagram-v2
+    direction LR
+
+    [*] --> ESTABLE : Inicialización
+    
+    ESTABLE --> ESTABLE : P = 0.70
+    ESTABLE --> FLUCTUANTE : P = 0.25
+    ESTABLE --> CRÍTICO : P = 0.05
+    
+    FLUCTUANTE --> ESTABLE : P = 0.30
+    FLUCTUANTE --> FLUCTUANTE : P = 0.50
+    FLUCTUANTE --> CRÍTICO : P = 0.20
+    
+    CRÍTICO --> ESTABLE : P = 0.15
+    CRÍTICO --> FLUCTUANTE : P = 0.35
+    CRÍTICO --> CRÍTICO : P = 0.50
+```
+
+- **Distribución Estacionaria $\pi$**: Calculada mediante el método de potencias $\pi P = \pi \implies \pi \approx [0.453, 0.358, 0.189]$.
+- **Impacto Físico**: Modula la tasa de recarga solar de Spark ($\times 1.0, \times 0.6, \times 0.2$) y la velocidad de alerta del Bot de Mantenimiento.
+
+---
+
+## 5. Paradigma 5: Modelos Ocultos de Markov (HMM - Diagnóstico Latente)
+
+Tupla $\lambda = (A, B, \pi_0)$ para inferencia y filtrado sobre estados inobservables del núcleo de la estación.
+
+```mermaid
+graph TD
+    subgraph Estados_Ocultos ["Estados Ocultos (Desgaste del Núcleo)"]
+        H0["Óptimo"]
+        H1["Degradado"]
+        H2["Crítico"]
+        H0 -->|"A[0,0]=0.75"| H0
+        H0 -->|"A[0,1]=0.20"| H1
+        H1 -->|"A[1,1]=0.70"| H1
+        H1 -->|"A[1,2]=0.20"| H2
+        H2 -->|"A[2,2]=0.80"| H2
+    end
+
+    subgraph Emisiones_Observables ["Señales de Telemetría (Sensores)"]
+        O0["Verde (Nominal)"]
+        O1["Amarillo (Vibración)"]
+        O2["Rojo (Alarma)"]
+    end
+
+    H0 -.->|"B=0.70"| O0
+    H0 -.->|"B=0.25"| O1
+    H1 -.->|"B=0.60"| O1
+    H1 -.->|"B=0.20"| O2
+    H2 -.->|"B=0.70"| O2
+
+    subgraph Algoritmos ["Inferencia y Decodificación"]
+        Viterbi["Algoritmo de Viterbi: Secuencia Óptima X̂_{1:T}"]
+        Forward["Filtro Forward: Creencia P(X_t | Y_{1:t})"]
+    end
+```
+
+---
+
+## 6. Paradigma 6: Teoría de Juegos (Interacción Estratégica)
+
+Juego bimatriz $2 \times 2$ entre Spark (Dron) y Bot de Mantenimiento (Seguridad).
+
+| Spark \ Bot | Patrulla Suave (0) | Escaneo Estricto (1) |
+|:---|:---:|:---:|
+| **Cauto / Stealth (0)** | $(3.0, 3.0)$ | $(1.0, 4.0)$ |
+| **Audaz / Rush (1)** | $(4.0, 1.0)$ | $(0.0, 0.0)$ |
+
+```mermaid
+graph LR
+    SparkChoice["Spark: {Cauto, Audaz}"] --> PayoffMatrix["Bimatriz de Pagos U(s_1, s_2)"]
+    BotChoice["Bot: {Patrulla, Escaneo}"] --> PayoffMatrix
+    
+    PayoffMatrix --> PureNash["Equilibrios Puros: (Cauto, Escaneo) y (Audaz, Patrulla)"]
+    PayoffMatrix --> MixedNash["Equilibrio Mixto: p* = 50%, q* = 50% | E[U] = (2.0, 2.0)"]
+    PayoffMatrix --> StrategicModifiers["Modificadores en Simulación: Costo de Motores y Radio de Visión"]
+```
+
