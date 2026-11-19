@@ -103,6 +103,8 @@ func _physics_process(delta: float) -> void:
 		if state_label:
 			state_label.text = "EN ESPERA"
 		var environment = get_parent()
+		if environment and environment.has_method("bayes_stop"):
+			environment.bayes_stop()   # programa terminado / victoria: se limpia el mapa de calor
 		if environment and environment.has_method("update_debug_ui"):
 			environment.update_debug_ui("PATRULLA", "NO DETECTADO", "N/A", "ESPERANDO EJECUCIÓN DEL PROGRAMA", vision_radius)
 		return
@@ -155,6 +157,7 @@ func decide() -> void:
 		if prev_state != State.CHASE:
 			var env = get_parent()
 			if env and env.has_method("notify_spark_detected"): env.notify_spark_detected()
+			if env and env.has_method("bayes_stop"): env.bayes_stop()   # lo ve: ya no hace falta la creencia
 		
 		if distance_to_spark <= stopping_distance:
 			_handle_catch_spark()
@@ -163,21 +166,25 @@ func decide() -> void:
 			calculated_velocity = direction * chase_speed
 			current_action_description = "PERSIGUIENDO A SPARK"
 
-	# CASO B: SPARK SALIÓ DEL ÁREA DE VISIÓN (BÚSQUEDA EN ÚLTIMA POSICIÓN CONOCIDA)
+	# CASO B: SPARK SALIÓ DEL ÁREA DE VISIÓN (BÚSQUEDA BAYESIANA)
+	# En vez de ir solo a la última posición conocida, el Bot va a la casilla más
+	# probable de su creencia (estimador MAP) hasta rendirse (ver BayesSearch).
 	elif current_state == State.CHASE or current_state == State.SEARCH:
-		# Notifica a Main cuando el Bot pierde a Spark
+		var env = get_parent()
+		# Notifica a Main cuando el Bot pierde a Spark y arranca la creencia en su última posición
 		if prev_state == State.CHASE:
-			var env = get_parent()
 			if env and env.has_method("notify_spark_lost"): env.notify_spark_lost()
-		var dist_to_last_known: float = global_position.distance_to(last_known_spark_position)
-		
-		if dist_to_last_known > 20.0 and last_known_spark_position != Vector2.ZERO:
+			if env and env.has_method("bayes_start"): env.bayes_start(last_known_spark_position)
+
+		if env and env.has_method("bayes_step") and not env.bayes_exhausted():
 			current_state = State.SEARCH
 			current_target_string = "PERDIDO"
-			var direction: Vector2 = global_position.direction_to(last_known_spark_position)
-			calculated_velocity = direction * chase_speed
-			current_action_description = "BUSCANDO ÚLTIMA POSICIÓN CONOCIDA"
+			var target: Vector2 = env.bayes_step(global_position, vision_radius, get_physics_process_delta_time())
+			calculated_velocity = global_position.direction_to(target) * chase_speed
+			current_action_description = "BUSCANDO (IA BAYESIANA)"
 		else:
+			# Se rinde: creencia demasiado difusa o más de 10 s buscando
+			if env and env.has_method("bayes_stop"): env.bayes_stop()
 			current_state = State.PATROL
 			current_target_string = "NO DETECTADO"
 			_decide_patrol()
@@ -209,10 +216,13 @@ func _decide_patrol() -> void:
 # Orden de Main (resultado del juego en cobertura): ir a la posición dada.
 # Usa BÚSQUEDA (misma velocidad de persecución) y no PERSEGUIR: si no ve a Spark,
 # PERSEGUIR dispararía de inmediato "SPARK PERDIDO" y taparía el banner del evento.
+# Como se salta la transición PERSEGUIR -> perdido, aquí arranca la creencia bayesiana.
 func force_chase(pos: Vector2) -> void:
 	last_known_spark_position = pos
 	current_state = State.SEARCH
 	prev_state = State.SEARCH
+	var env = get_parent()
+	if env and env.has_method("bayes_start"): env.bayes_start(pos)
 
 # Activa un modo táctico (CoverMode) durante `duration` segundos
 func set_cover_mode(mode: int, duration: float) -> void:

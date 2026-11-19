@@ -187,3 +187,22 @@ Nodos añadidos a `main.tscn` (Main sigue siendo el mediador; ningún nodo nuevo
 - Spark gana el comando `SONDEAR`, que llama a `Main.run_obstacle_probe()`.
 - Los muros solo bloquean a Spark (conjunto lógico de casillas, `Main.is_cell_blocked()`); el Bot no se bloquea.
 - Detalle de valores y geometría: `Mejoras_HMM_Teoria_de_Juegos.md`, §2.2.1.
+
+## 8. Paradigma 7: Búsqueda bayesiana (filtro de Bayes en cuadrícula)
+
+Cuando el Bot pierde a Spark, `BayesSearch` (hijo de Main, dibujado bajo los actores) mantiene una creencia $b(c) = P(\text{Spark en } c)$ sobre las 100 casillas de Spark ($x = 150 + 64i$, $y = 600 - 64j$, $i,j = 0..9$). Las casillas que `Main.is_cell_blocked()` declara bloqueadas valen siempre 0. El Bot va a la casilla más probable (MAP).
+
+- **Inicio:** 0.6 en la casilla de la última posición conocida; el resto, repartido entre sus vecinas libres.
+- **Predicción** (un paso cada 0.5 s, igual que Spark): cada casilla conserva 0.2 de su masa y reparte 0.8 entre sus vecinas libres. $\sum_c b(c) = 1$ se conserva.
+
+$$b'(c) = \sum_{n} b(n)\, T(n \to c)$$
+
+- **Actualización (información negativa):** si el Bot no ve a Spark, las casillas dentro del radio de visión se multiplican por $L = 1 - P_d$, con $P_d = 0.9$, y se normaliza. $P_d < 1$ es coherente con el camuflaje: un Spark oculto no queda descartado con certeza.
+
+$$b(c) \propto b(c)\, L(c), \qquad L(c) = \begin{cases} 1 - P_d & \text{si } \lVert c - \text{bot} \rVert \le r \\ 1 & \text{en otro caso} \end{cases}$$
+
+- **Salida:** $\hat c = \arg\max_c b(c)$; entropía $H = -\sum_c b(c)\log_2 b(c)$ (se muestra en la pestaña BayesTab).
+- **Fin de la búsqueda:** si ve a Spark vuelve a PERSEGUIR; se rinde (vuelve a PATRULLA) si $\max_c b(c) < 0.05$ o pasan 10 s.
+- **Mediador:** el Bot nunca habla con `BayesSearch`; usa `Main.bayes_start / bayes_step / bayes_exhausted / bayes_stop`.
+- **Límites:** la visión sigue siendo un radio sin línea de vista (el filtro usa el mismo sensor) y el mapa de calor cubre solo la cuadrícula de Spark; el Bot se mueve libremente.
+- **Prueba:** `tests/test_bayes_search.gd` (conservación de masa, casillas bloqueadas, factor $1-P_d$ y Monte Carlo de 500 ensayos).

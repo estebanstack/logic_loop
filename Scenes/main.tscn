@@ -14,6 +14,7 @@
 [ext_resource type="PackedScene" uid="uid://dxj3q815m2p1y" path="res://Scenes/advanced_models_panel.tscn" id="12_models_panel"]
 [ext_resource type="Script" path="res://Scripts/damaged_barrier.gd" id="13_barrier_script"]
 [ext_resource type="Script" path="res://Scripts/walls.gd" id="14_walls_script"]
+[ext_resource type="Script" path="res://Scripts/bayes_search.gd" id="15_bayes_script"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_npc"]
 size = Vector2(40, 40)
@@ -29,6 +30,9 @@ script = ExtResource("1_main_script")
 
 [node name="Walls" type="Node2D" parent="."]
 script = ExtResource("14_walls_script")
+
+[node name="BayesSearch" type="Node2D" parent="."]
+script = ExtResource("15_bayes_script")
 
 [node name="DamagedBarrier" type="Node2D" parent="."]
 position = Vector2(470, 408)

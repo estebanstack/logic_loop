@@ -23,7 +23,7 @@ theme_override_constants/separation = 4
 layout_mode = 2
 theme_override_colors/font_color = Color(0.9, 0.7, 1, 1)
 theme_override_font_sizes/font_size = 12
-text = "MODELOS AVANZADOS (MARKOV · HMM · TEORÍA DE JUEGOS)"
+text = "MODELOS AVANZADOS (MARKOV · HMM · JUEGOS · BAYES)"
 horizontal_alignment = 1
 
 [node name="TabContainer" type="TabContainer" parent="Margin/VBox"]
@@ -165,3 +165,31 @@ text = " RESOLVER ENCUENTRO "
 layout_mode = 2
 theme_override_font_sizes/font_size = 10
 text = "Sin rondas jugadas | Marcador: Spark 0 - 0 Bot"
+
+[node name="BayesTab" type="VBoxContainer" parent="Margin/VBox/TabContainer"]
+visible = false
+layout_mode = 2
+theme_override_constants/separation = 4
+metadata/_tab_index = 3
+
+[node name="StateLabel" type="Label" parent="Margin/VBox/TabContainer/BayesTab"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.75, 0.3, 1)
+theme_override_font_sizes/font_size = 11
+text = "Búsqueda: INACTIVA (el Bot patrulla o ve a Spark)"
+
+[node name="MapLabel" type="Label" parent="Margin/VBox/TabContainer/BayesTab"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+text = "Casilla MAP (más probable): —"
+
+[node name="StatsLabel" type="Label" parent="Margin/VBox/TabContainer/BayesTab"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.4, 0.9, 1, 1)
+theme_override_font_sizes/font_size = 10
+text = "P máx = —  |  Entropía H = —"
+
+[node name="ModelLabel" type="Label" parent="Margin/VBox/TabContainer/BayesTab"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 10
+text = "Detección P_d = 0.90"

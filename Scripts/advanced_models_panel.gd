@@ -4,16 +4,18 @@ class_name AdvancedModelsPanel
 # ==============================================================================
 # DASHBOARD DE MODELOS Y SIMULACIÓN AVANZADA
 # ==============================================================================
-# Integra en pestañas de interfaz los tres modelos matemáticos:
+# Integra en pestañas de interfaz los cuatro modelos matemáticos:
 # 1. Cadenas de Markov (Clima Espacial / Fluctuaciones)
 # 2. Modelos Ocultos de Markov (HMM - Diagnóstico de Desgaste Latente del Núcleo)
 # 3. Teoría de Juegos (Estrategias de Interacción Spark vs Bot)
+# 4. Búsqueda Bayesiana (Creencia del Bot sobre la posición de Spark)
 # ==============================================================================
 
 # Referencias a los motores matemáticos (asignados por Main o buscados en árbol)
 var markov_chain: MarkovChain = null
 var hmm: HiddenMarkovModel = null
 var game_theory: GameTheoryEngine = null
+var bayes: BayesSearch = null
 
 # Referencias a nodos UI
 @onready var tab_container: TabContainer = get_node_or_null("Margin/VBox/TabContainer")
@@ -42,16 +44,23 @@ var game_theory: GameTheoryEngine = null
 @onready var gt_play_btn: Button = get_node_or_null("Margin/VBox/TabContainer/GameTheoryTab/HBoxAction/BtnPlayRound")
 @onready var gt_score_label: Label = get_node_or_null("Margin/VBox/TabContainer/GameTheoryTab/ScoreLabel")
 
+# --- UI BÚSQUEDA BAYESIANA ---
+@onready var bayes_state_label: Label = get_node_or_null("Margin/VBox/TabContainer/BayesTab/StateLabel")
+@onready var bayes_map_label: Label = get_node_or_null("Margin/VBox/TabContainer/BayesTab/MapLabel")
+@onready var bayes_stats_label: Label = get_node_or_null("Margin/VBox/TabContainer/BayesTab/StatsLabel")
+@onready var bayes_model_label: Label = get_node_or_null("Margin/VBox/TabContainer/BayesTab/ModelLabel")
+
 # Estrategia seleccionada actualmente para Spark en Teoría de Juegos (0=Cauto, 1=Audaz)
 var spark_chosen_strategy: int = 0
 
 func _ready() -> void:
 	_connect_signals()
 
-func setup_engines(mc: MarkovChain, h: HiddenMarkovModel, gt: GameTheoryEngine) -> void:
+func setup_engines(mc: MarkovChain, h: HiddenMarkovModel, gt: GameTheoryEngine, bs: BayesSearch = null) -> void:
 	markov_chain = mc
 	hmm = h
 	game_theory = gt
+	bayes = bs
 	
 	if markov_chain:
 		markov_chain.state_changed.connect(_on_markov_state_changed)
@@ -64,6 +73,9 @@ func setup_engines(mc: MarkovChain, h: HiddenMarkovModel, gt: GameTheoryEngine) 
 	if game_theory:
 		game_theory.round_resolved.connect(_on_gt_round_resolved)
 		game_theory.preset_changed.connect(_on_gt_preset_changed)
+
+	if bayes:
+		bayes.belief_changed.connect(update_bayes_ui)
 	
 	refresh_all_ui()
 
@@ -89,6 +101,7 @@ func refresh_all_ui() -> void:
 	update_markov_ui()
 	update_hmm_ui()
 	update_game_theory_ui()
+	update_bayes_ui()
 
 # ==============================================================================
 # UI 1: CADENAS DE MARKOV
@@ -281,3 +294,27 @@ func _on_gt_round_resolved(_data: Dictionary) -> void:
 
 func _on_gt_preset_changed(_name: String) -> void:
 	update_game_theory_ui()
+
+# ==============================================================================
+# UI 4: BÚSQUEDA BAYESIANA
+# ==============================================================================
+func update_bayes_ui() -> void:
+	if not bayes:
+		return
+	if bayes_state_label:
+		bayes_state_label.text = "Búsqueda: ACTIVA" if bayes.active else "Búsqueda: INACTIVA (el Bot patrulla o ve a Spark)"
+	if bayes_map_label:
+		if bayes.active:
+			var cell: Vector2 = bayes.map_cell()
+			bayes_map_label.text = "Casilla MAP (más probable): (%d, %d) px" % [int(cell.x), int(cell.y)]
+		else:
+			bayes_map_label.text = "Casilla MAP (más probable): —"
+	if bayes_stats_label:
+		if bayes.active:
+			bayes_stats_label.text = "P máx = %.1f%%  |  Entropía H = %.2f bits (máx. %.2f)" % [
+				bayes.max_prob() * 100.0, bayes.entropy(), log(float(bayes.belief.size())) / log(2.0)
+			]
+		else:
+			bayes_stats_label.text = "P máx = —  |  Entropía H = —"
+	if bayes_model_label:
+		bayes_model_label.text = "Detección P_d = %.2f  |  Predicción: 0.2 se queda, 0.8 a vecinas\nActualización: b(c) ∝ b(c)·(1−P_d) dentro de la visión" % BayesSearch.P_DETECT

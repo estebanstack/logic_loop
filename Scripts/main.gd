@@ -8,6 +8,7 @@ extends Node2D
 # 4. CADENAS DE MARKOV: Proceso estocástico del clima y radiación de la estación
 # 5. MODELOS OCULTOS DE MARKOV (HMM): Diagnóstico latente de desgaste del núcleo y Viterbi
 # 6. TEORÍA DE JUEGOS: Interacción estratégica (Nash, matriz de pagos) entre Spark y Bot
+# 7. BÚSQUEDA BAYESIANA: Creencia (filtro de Bayes en cuadrícula) del Bot sobre dónde está Spark
 
 @onready var maintenance_bot: Node2D  = get_node_or_null("MaintenanceBot")
 @onready var spark: Node2D            = get_node_or_null("Spark")
@@ -38,6 +39,9 @@ extends Node2D
 @onready var obstacle_hmm: HiddenMarkovModel                 = get_node_or_null("ObstacleHMM")
 @onready var cover_game_engine: GameTheoryEngine             = get_node_or_null("CoverGameEngine")
 @onready var barrier: Node2D                                 = get_node_or_null("DamagedBarrier")
+
+# PARADIGMA 7: filtro de Bayes del Bot (el Bot lo usa solo a través de Main)
+@onready var bayes_search: BayesSearch                       = get_node_or_null("BayesSearch")
 
 # Parámetros base para restablecer tras modificaciones ambientales/estratégicas
 var base_solar_inflow: float = 1.0
@@ -123,9 +127,16 @@ func _init_advanced_engines() -> void:
 		game_theory_engine.name = "GameTheoryEngine"
 		add_child(game_theory_engine)
 
+	if not bayes_search:
+		bayes_search = BayesSearch.new()
+		bayes_search.name = "BayesSearch"
+		add_child(bayes_search)
+	# El filtro no conoce a Main: recibe la regla de bloqueo como Callable
+	bayes_search.setup(is_cell_blocked)
+
 	# Conexión con el panel UI
 	if advanced_models_panel:
-		advanced_models_panel.setup_engines(markov_chain, hidden_markov_model, game_theory_engine)
+		advanced_models_panel.setup_engines(markov_chain, hidden_markov_model, game_theory_engine, bayes_search)
 	
 	# Escucha de señales para retroalimentar la física y simulación del entorno
 	if markov_chain:
@@ -221,6 +232,7 @@ func _reset_obstacle_state() -> void:
 	barrier_known_armored = false
 	event_banner_lock_left = 0.0
 	_set_spark_hidden(false)
+	bayes_stop()   # reinicio / captura / batería agotada: se descarta la creencia del Bot
 	if obstacle_hmm:
 		obstacle_hmm.reset_hmm()
 		obstacle_hmm.resample_true_state()   # π0 = [0.5, 0.5]
@@ -278,6 +290,24 @@ func run_obstacle_probe(spark_pos: Vector2, facing: int) -> String:
 		spark.follow_path(DETOUR_PATH)
 		notify_execution_status("Spark RODEA la barrera (P(Frágil)=%.2f)" % diag.belief_fragil)
 	return decision
+
+# ==============================================================================
+# PARADIGMA 7: BÚSQUEDA BAYESIANA (el Bot la usa solo a través de Main)
+# ==============================================================================
+func bayes_start(pos: Vector2) -> void:
+	if bayes_search:
+		bayes_search.start(pos)
+
+# Avanza el filtro (un paso cada 0.5 s) y devuelve la casilla MAP hacia la que ir
+func bayes_step(bot_pos: Vector2, radius: float, delta: float) -> Vector2:
+	return bayes_search.step(bot_pos, radius, delta) if bayes_search else bot_pos
+
+func bayes_exhausted() -> bool:
+	return bayes_search == null or bayes_search.is_exhausted()
+
+func bayes_stop() -> void:
+	if bayes_search and bayes_search.active:
+		bayes_search.clear()
 
 # Se llama tras cada paso de Spark: la primera vez por corrida que pisa la
 # casilla de cobertura se juega una ronda del juego de inspección.
