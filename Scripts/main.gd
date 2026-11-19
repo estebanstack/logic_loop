@@ -34,10 +34,16 @@ extends Node2D
 @onready var game_theory_engine: GameTheoryEngine            = get_node_or_null("GameTheoryEngine")
 @onready var advanced_models_panel: AdvancedModelsPanel      = get_node_or_null("UI/AdvancedModelsPanel")
 
+# BARRERA DAÑADA: HMM de 2 estados (segunda instancia) y juego de inspección (segundo motor)
+@onready var obstacle_hmm: HiddenMarkovModel                 = get_node_or_null("ObstacleHMM")
+@onready var cover_game_engine: GameTheoryEngine             = get_node_or_null("CoverGameEngine")
+@onready var barrier: Node2D                                 = get_node_or_null("DamagedBarrier")
+
 # Parámetros base para restablecer tras modificaciones ambientales/estratégicas
 var base_solar_inflow: float = 1.0
 var base_bot_speed: float = 100.0
 var base_motor_cost: float = 4.0
+const BASE_VISION_RADIUS: float = 250.0
 
 # Rutas de patrulla en la estación espacial para el Bot de Mantenimiento
 @export var station_patrol_waypoints: Array[Vector2] = [
@@ -49,6 +55,49 @@ var base_motor_cost: float = 4.0
 
 var is_simulation_running: bool = false
 var is_level_completed: bool = false
+
+# ==============================================================================
+# GEOMETRÍA DE LA BARRERA (cuadrícula de Spark: x = 150 + 64i, y = 600 - 64j)
+# ==============================================================================
+# Los muros son un conjunto LÓGICO de casillas bloqueadas (Spark se teletransporta
+# por la cuadrícula y no usa colisiones físicas). El Bot NO se bloquea con ellos:
+# se mueve en línea recta sin pathfinding, así que la barrera es un obstáculo
+# terrestre y el bot "flota" por encima.
+const BARRIER_CELL: Vector2 = Vector2(470, 408)   # Barrera dañada, en la fila del dispensador
+const WALL_X: float = 470.0                       # Columna de muro (todas las filas salvo barrera y hueco)
+const GAP_Y: float = 536.0                        # Único hueco: permite el desvío
+const COVER_CELL: Vector2 = Vector2(406, 408)     # Casilla de cobertura (oeste de la barrera)
+const EXIT_CELL: Vector2 = Vector2(534, 408)      # Casilla de salida (este de la barrera)
+const CELL_TOL: float = 8.0
+const WALL_TOP_Y: float = 24.0                    # Primera casilla de muro dibujada (visual)
+const WALL_BOTTOM_Y: float = 664.0
+
+# Rutas que Spark recorre tras SONDEAR (se recorren paso a paso)
+const RAM_PATH: Array[Vector2] = [Vector2(470, 408), Vector2(534, 408)]               # 2 pasos
+const DETOUR_PATH: Array[Vector2] = [Vector2(406, 472), Vector2(406, 536), Vector2(470, 536),
+		Vector2(534, 536), Vector2(534, 472), Vector2(534, 408)]                      # 6 pasos
+
+# Parámetros del diagnóstico y de los efectos (decisiones nuestras, no del enunciado)
+const PROBE_PULSES: int = 3
+const FRACTURE_THRESHOLD: float = 0.65            # θ de la regla de decisión
+const ARMOR_DAMAGE: float = 15.0                  # % de batería al rebotar contra blindaje
+const ARMOR_STUN: float = 1.0                     # s de aturdimiento
+const AMBUSH_DAMAGE: float = 15.0                 # % de batería en la emboscada
+const EVASION_BONUS: float = 10.0                 # % de batería extra en la evasión limpia (elección propia)
+const COVER_WINDOW: float = 3.0                   # s de duración del efecto del encuentro
+
+# Modos del bot (deben coincidir con npc.gd: enum CoverMode { NONE, SWEEP, PATROL })
+const COVER_SWEEP: int = 1
+const COVER_PATROL: int = 2
+
+const BANNER_DEFAULT_COLOR: Color = Color(1, 0.85, 0.1, 1)
+
+var cover_triggered: bool = false                 # El encuentro se juega una vez por corrida
+var spark_hidden: bool = false                    # Spark camuflado: el bot no lo percibe
+var spark_hidden_time_left: float = 0.0
+var _banner_tween: Tween = null
+var event_banner_lock_left: float = 0.0           # Mientras sea > 0, el Bot no pisa el banner de un evento
+var barrier_known_armored: bool = false           # Tras un rebote la pared es BLINDADA con certeza
 
 func _ready() -> void:
 	if game_over_modal: game_over_modal.visible = false
@@ -84,6 +133,33 @@ func _init_advanced_engines() -> void:
 	if game_theory_engine:
 		game_theory_engine.round_resolved.connect(_on_strategic_round_resolved)
 
+	# HMM de la barrera: S = {FRÁGIL, BLINDADO}, V = {ECO HUECO, ECO AMBIGUO, ECO SÓLIDO}
+	if not obstacle_hmm:
+		obstacle_hmm = HiddenMarkovModel.new()
+		obstacle_hmm.name = "ObstacleHMM"
+		add_child(obstacle_hmm)
+	# A = identidad: la pared en reposo no cambia de integridad. Con A = I el filtro
+	# Forward se reduce a Bayes secuencial (fácil de defender) y sondear no puede
+	# "endurecer" el muro, lo cual no tendría sentido físico.
+	obstacle_hmm.configure(
+		["FRÁGIL", "BLINDADO"],
+		["ECO HUECO", "ECO AMBIGUO", "ECO SÓLIDO"],
+		[[1.0, 0.0], [0.0, 1.0]],
+		[[0.70, 0.25, 0.05], [0.05, 0.25, 0.70]],
+		[0.5, 0.5]
+	)
+	# La barrera nunca usa Viterbi: se evita recalcularlo en cada pulso
+	obstacle_hmm.auto_viterbi = false
+
+	# Juego de inspección en la cobertura (no toca el GameTheoryEngine / Hawk-Dove)
+	if not cover_game_engine:
+		cover_game_engine = GameTheoryEngine.new()
+		cover_game_engine.name = "CoverGameEngine"
+		add_child(cover_game_engine)
+	cover_game_engine.load_preset(GameTheoryEngine.PresetType.STEALTH_COVER)
+
+	_reset_obstacle_state()
+
 # INTERFAZ DEL ENTORNO
 func get_environment_info() -> Dictionary:
 	var spark_active: bool    = spark != null and spark.visible
@@ -97,8 +173,156 @@ func get_environment_info() -> Dictionary:
 		"has_repair_component": comp_active,
 		"repair_component_position": comp_pos,
 		"patrol_waypoints": station_patrol_waypoints,
-		"is_simulation_running": is_simulation_running
+		"is_simulation_running": is_simulation_running,
+		"spark_hidden": spark_hidden,
+		"barrier_position": BARRIER_CELL
 	}
+
+# ==============================================================================
+# BARRERA DAÑADA: BLOQUEO LÓGICO, DIAGNÓSTICO HMM Y ENCUENTRO EN COBERTURA
+# ==============================================================================
+func _process(delta: float) -> void:
+	# Bloqueo de banner de evento: cuenta regresiva
+	if event_banner_lock_left > 0.0:
+		event_banner_lock_left = maxf(0.0, event_banner_lock_left - delta)
+	# Ventana de camuflaje: al terminar, Spark vuelve a ser perceptible
+	if spark_hidden:
+		spark_hidden_time_left -= delta
+		if spark_hidden_time_left <= 0.0:
+			_set_spark_hidden(false)
+
+func _same_cell(a: Vector2, b: Vector2) -> bool:
+	return a.distance_to(b) <= CELL_TOL
+
+# ¿La casilla está bloqueada para Spark? Muro en toda la columna salvo el hueco,
+# y la barrera mientras no esté destruida.
+func is_cell_blocked(pos: Vector2) -> bool:
+	if absf(pos.x - WALL_X) > CELL_TOL:
+		return false
+	if absf(pos.y - GAP_Y) <= CELL_TOL:
+		return false
+	if absf(pos.y - BARRIER_CELL.y) <= CELL_TOL:
+		return barrier == null or not barrier.is_destroyed
+	return true
+
+# Casillas de muro visibles (para dibujarlas): la columna sin la barrera ni el hueco
+func get_wall_cells() -> Array[Vector2]:
+	var cells: Array[Vector2] = []
+	var y: float = WALL_TOP_Y
+	while y <= WALL_BOTTOM_Y:
+		if absf(y - GAP_Y) > CELL_TOL and absf(y - BARRIER_CELL.y) > CELL_TOL:
+			cells.append(Vector2(WALL_X, y))
+		y += 64.0
+	return cells
+
+# Reinicia la barrera, sortea un estado oculto nuevo y limpia los efectos de cobertura
+func _reset_obstacle_state() -> void:
+	cover_triggered = false
+	barrier_known_armored = false
+	event_banner_lock_left = 0.0
+	_set_spark_hidden(false)
+	if obstacle_hmm:
+		obstacle_hmm.reset_hmm()
+		obstacle_hmm.resample_true_state()   # π0 = [0.5, 0.5]
+	if barrier:
+		barrier.restore()
+		if obstacle_hmm:
+			barrier.is_breakable = (obstacle_hmm.current_true_hidden_state == 0)
+
+func _set_spark_hidden(on: bool) -> void:
+	spark_hidden = on
+	spark_hidden_time_left = COVER_WINDOW if on else 0.0
+	if spark and spark.has_method("set_camouflaged"):
+		spark.set_camouflaged(on)
+
+# SONDEAR (lo llama Spark): solo válido en la casilla de cobertura mirando al este
+func run_obstacle_probe(spark_pos: Vector2, facing: int) -> String:
+	if facing != 0 or not _same_cell(spark_pos, COVER_CELL) or barrier == null or barrier.is_destroyed or obstacle_hmm == null:
+		_show_banner("[?] Sin obstáculo al frente", BANNER_DEFAULT_COLOR, 2.0, false, true)
+		notify_execution_status("Sin obstáculo al frente")
+		return "NINGUNO"
+
+	# Tras un rebote la pared ya es BLINDADA con certeza: no se vuelve a sondear
+	if barrier_known_armored:
+		spark.follow_path(DETOUR_PATH)
+		notify_execution_status("Blindaje confirmado: RODEAR")
+		return "RODEAR"
+
+	var diag: Dictionary = obstacle_hmm.diagnose_obstacle(PROBE_PULSES, FRACTURE_THRESHOLD)
+	var echo_names: Array[String] = []
+	for obs in diag.observations:
+		echo_names.append(obstacle_hmm.observation_names[obs])
+	barrier.show_echoes(echo_names, diag.belief_fragil)
+
+	var decision: String = diag.decision
+	var is_fragile: bool = barrier.is_breakable
+	if decision == "FRACTURAR":
+		if is_fragile:
+			barrier.destroy()
+			spark.follow_path(RAM_PATH)
+			notify_execution_status("Barrera FRÁGIL fracturada (P(Frágil)=%.2f)" % diag.belief_fragil)
+		else:
+			# Rebote contra el blindaje: daño, aturdimiento y el estruendo alerta al Bot
+			spark.drain_energy(ARMOR_DAMAGE)
+			spark.stun(ARMOR_STUN)
+			# El rebote es evidencia directa: P(Blindado) = 1 para sondeos posteriores
+			barrier_known_armored = true
+			obstacle_hmm.current_belief = [0.0, 1.0]
+			_show_banner("[!] ¡BARRERA BLINDADA! Rebote", Color(1, 0.4, 0.2), 2.0, false, true)
+			# El estruendo delata a Spark aunque esté camuflado
+			_set_spark_hidden(false)
+			if maintenance_bot and maintenance_bot.has_method("force_chase"):
+				maintenance_bot.force_chase(spark_pos)
+			notify_execution_status("¡Barrera BLINDADA! Rebote (P(Frágil)=%.2f)" % diag.belief_fragil)
+	else:
+		spark.follow_path(DETOUR_PATH)
+		notify_execution_status("Spark RODEA la barrera (P(Frágil)=%.2f)" % diag.belief_fragil)
+	return decision
+
+# Se llama tras cada paso de Spark: la primera vez por corrida que pisa la
+# casilla de cobertura se juega una ronda del juego de inspección.
+func on_spark_stepped(pos: Vector2) -> void:
+	if is_simulation_running and not cover_triggered and _same_cell(pos, COVER_CELL):
+		cover_triggered = true
+		_resolve_cover_encounter(pos)
+
+# Ronda del juego STEALTH_COVER: cada jugador sortea su acción con su
+# probabilidad de equilibrio mixto (p* = P(Ocultarse), q* = P(Barrido)).
+func _resolve_cover_encounter(spark_pos: Vector2) -> void:
+	if cover_game_engine == null:
+		return
+	var mixed: Dictionary = cover_game_engine.calculate_mixed_nash_equilibrium()
+	var a1: int = 0 if randf() < float(mixed.p_star) else 1   # 0 = OCULTARSE, 1 = AVANZAR
+	var a2: int = 0 if randf() < float(mixed.q_star) else 1   # 0 = BARRIDO, 1 = PATRULLA
+	cover_game_engine.play_round(a1, a2)
+	var odds: String = " (p*=%.2f, q*=%.2f)" % [mixed.p_star, mixed.q_star]
+
+	match [a1, a2]:
+		[0, 0]:
+			_show_banner("¡EMBOSCADA EN COBERTURA!" + odds, Color(1, 0.25, 0.2), COVER_WINDOW, false, true)
+			spark.drain_energy(AMBUSH_DAMAGE)
+			_cover_bot_reaction(COVER_SWEEP, true, spark_pos)
+		[0, 1]:
+			_show_banner("¡EVASIÓN LIMPIA!" + odds, Color(0.3, 1, 0.4), COVER_WINDOW, false, true)
+			spark.add_energy(EVASION_BONUS)
+			_set_spark_hidden(true)
+			_cover_bot_reaction(COVER_PATROL, false, spark_pos)
+		[1, 0]:
+			_show_banner("¡CARRERA LIBRE!" + odds, Color(0.35, 0.6, 1), COVER_WINDOW, false, true)
+			_set_spark_hidden(true)
+			spark.play_rush_trail()
+			_cover_bot_reaction(COVER_SWEEP, false, spark_pos)
+		_:
+			_show_banner("¡INTERCEPTADO EN CAMPO ABIERTO!" + odds, Color(1, 0.2, 0.2), COVER_WINDOW, true, true)
+			spark.play_rush_trail()
+			_cover_bot_reaction(COVER_PATROL, true, spark_pos)
+
+func _cover_bot_reaction(mode: int, chase: bool, spark_pos: Vector2) -> void:
+	if not maintenance_bot:
+		return
+	maintenance_bot.set_cover_mode(mode, COVER_WINDOW)
+	if chase:
+		maintenance_bot.force_chase(spark_pos)
 
 # INTERACCIÓN
 func check_interact(spark_pos: Vector2) -> void:
@@ -142,11 +366,12 @@ func check_interact(spark_pos: Vector2) -> void:
 			if victory_modal:
 				var msg = victory_modal.get_node_or_null("Margin/VBox/Msg")
 				if msg:
+					# Paréntesis: `%` liga más que `+`, así que debe aplicarse a toda la concatenación
 					msg.text = (
 						"¡Felicidades! Spark reparó la estación con éxito.\n" +
 						"Diagnóstico Oculto (Viterbi HMM): Componente en estado [%s].\n" +
-						"¡La falla latente ha sido neutralizada!" % diag_str
-					)
+						"¡La falla latente ha sido neutralizada!"
+					) % diag_str
 				victory_modal.visible = true
 			return
 
@@ -171,10 +396,7 @@ func _on_markov_climate_changed(_old: int, new_state: int, state_name: String) -
 		
 	if new_state == MarkovChain.State.CRITICAL:
 		notify_execution_status("¡ALERTA RADIOLÓGICA! Clima espacial: " + state_name)
-		if detection_banner:
-			detection_banner.text = "[!] CLIMA ESPACIAL: TORMENTA DE RADIACIÓN"
-			detection_banner.visible = true
-			if detection_timer: detection_timer.start(2.5)
+		_show_banner("[!] CLIMA ESPACIAL: TORMENTA DE RADIACIÓN", BANNER_DEFAULT_COLOR, 2.5, false, true)
 
 # ==============================================================================
 # INTEGRACIÓN DEL PARADIGMA 6: TEORÍA DE JUEGOS EN EL JUEGO
@@ -183,11 +405,17 @@ func _on_strategic_round_resolved(data: Dictionary) -> void:
 	var spark_action: int = data.get("a1", 0)
 	var bot_action: int = data.get("a2", 0)
 	
+	# Solo HAWK_DOVE tiene acciones CAUTO/AUDAZ y PATRULLA/ESCANEO; en otros presets
+	# los índices 0/1 significan otra cosa, así que se restauran los valores base.
+	var is_hawk_dove: bool = game_theory_engine.current_preset == GameTheoryEngine.PresetType.HAWK_DOVE
+	
 	# Modificaciones al agente Spark:
 	# Cauto (0): Mayor eficiencia de energía (menor consumo motor)
 	# Audaz (1): Mayor consumo motor
 	if spark:
-		if spark_action == 0:
+		if not is_hawk_dove:
+			spark.set("motor_step_cost", base_motor_cost)
+		elif spark_action == 0:
 			spark.set("motor_step_cost", 2.5)
 		else:
 			spark.set("motor_step_cost", 4.5)
@@ -196,15 +424,16 @@ func _on_strategic_round_resolved(data: Dictionary) -> void:
 	# Escaneo Estricto (1): Mayor radio de visión
 	# Patrulla Suave (0): Visión normal
 	if maintenance_bot:
-		if bot_action == 1:
+		if is_hawk_dove and bot_action == 1:
 			maintenance_bot.set("vision_radius", 285.0)
 		else:
-			maintenance_bot.set("vision_radius", 250.0)
+			maintenance_bot.set("vision_radius", BASE_VISION_RADIUS)
 		maintenance_bot.queue_redraw()
 
 # GAME OVER POR CAPTURA
 func reset_spark() -> void:
 	is_simulation_running = false
+	_reset_obstacle_state()
 	notify_execution_status("¡SPARK FUE CAPTURADO!")
 	if game_over_modal:
 		var msg = game_over_modal.get_node_or_null("Margin/VBox/Msg")
@@ -219,6 +448,7 @@ func reset_spark() -> void:
 # GAME OVER POR SISTEMA DINÁMICO (BATERÍA AGOTADA)
 func on_battery_depleted() -> void:
 	is_simulation_running = false
+	_reset_obstacle_state()
 	notify_execution_status("¡BATERÍA AGOTADA!")
 	if game_over_modal:
 		var msg = game_over_modal.get_node_or_null("Margin/VBox/Msg")
@@ -237,19 +467,40 @@ func on_program_complete() -> void:
 
 # SEÑAL DEL BOT
 func notify_spark_detected() -> void:
-	if detection_banner:
-		detection_banner.text    = "[!] ¡SPARK DETECTADO!"
-		detection_banner.visible = true
-	if detection_timer: detection_timer.start(2.0)
+	if event_banner_lock_left > 0.0:
+		return
+	_show_banner("[!] ¡SPARK DETECTADO!", BANNER_DEFAULT_COLOR, 2.0)
 
 func notify_spark_lost() -> void:
-	if detection_banner:
-		detection_banner.text    = "[?] SPARK PERDIDO — BUSCANDO..."
-		detection_banner.visible = true
-	if detection_timer: detection_timer.start(2.0)
+	if event_banner_lock_left > 0.0:
+		return
+	_show_banner("[?] SPARK PERDIDO — BUSCANDO...", BANNER_DEFAULT_COLOR, 2.0)
+
+# Banner genérico (texto, color, duración); `flash` lo hace parpadear;
+# `priority` bloquea los avisos del Bot mientras dure el banner del evento
+func _show_banner(text: String, color: Color, duration: float, flash: bool = false, priority: bool = false) -> void:
+	if priority:
+		event_banner_lock_left = duration
+	if not detection_banner:
+		return
+	if _banner_tween and _banner_tween.is_valid():
+		_banner_tween.kill()
+	detection_banner.modulate.a = 1.0
+	detection_banner.text = text
+	detection_banner.add_theme_color_override("font_color", color)
+	detection_banner.visible = true
+	if flash:
+		_banner_tween = create_tween().set_loops(int(duration / 0.5))
+		_banner_tween.tween_property(detection_banner, "modulate:a", 0.25, 0.25)
+		_banner_tween.tween_property(detection_banner, "modulate:a", 1.0, 0.25)
+	if detection_timer: detection_timer.start(duration)
 
 func _on_detection_timer_timeout() -> void:
-	if detection_banner: detection_banner.visible = false
+	if _banner_tween and _banner_tween.is_valid():
+		_banner_tween.kill()
+	if detection_banner:
+		detection_banner.modulate.a = 1.0
+		detection_banner.visible = false
 
 # CONTROL DE SIMULACIÓN
 func start_simulation() -> void:
@@ -266,6 +517,13 @@ func start_simulation() -> void:
 
 func reset_simulation() -> void:
 	is_simulation_running = false
+	_reset_obstacle_state()
+	# Deshace los efectos de la última ronda estratégica
+	if spark:
+		spark.set("motor_step_cost", base_motor_cost)
+	if maintenance_bot:
+		maintenance_bot.set("vision_radius", BASE_VISION_RADIUS)
+		maintenance_bot.queue_redraw()
 	if spark and spark.has_method("reset_to_start"):
 		spark.reset_to_start()
 	if maintenance_bot and maintenance_bot.has_method("reset_to_start"):
@@ -283,6 +541,9 @@ func _on_btn_turn_right_pressed() -> void:
 
 func _on_btn_interact_pressed() -> void:
 	if spark and spark.has_method("add_command"): spark.add_command("INTERACT")
+
+func _on_btn_sondear_pressed() -> void:
+	if spark and spark.has_method("add_command"): spark.add_command("SONDEAR")
 
 func _on_btn_clear_pressed() -> void:
 	reset_simulation()
@@ -324,9 +585,9 @@ func update_program_sequence_ui(commands: Array, current_idx: int, executing: bo
 		var label: String = _cmd_label(commands[i])
 		var prefix: String
 		if executing:
-			if i < current_step_index_val(current_idx) - 1:
+			if i < current_idx - 1:
 				prefix = "[X] "      # ejecutado
-			elif i == current_step_index_val(current_idx) - 1:
+			elif i == current_idx - 1:
 				prefix = "[>] "      # ejecutándose
 			else:
 				prefix = "[ ] "      # pendiente
@@ -334,9 +595,6 @@ func update_program_sequence_ui(commands: Array, current_idx: int, executing: bo
 			prefix = "[ ] "
 		lines += prefix + label + "\n"
 	program_list.text = lines.strip_edges()
-
-func current_step_index_val(idx: int) -> int:
-	return idx
 
 func notify_execution_status(msg: String) -> void:
 	if feedback_label:
@@ -364,4 +622,5 @@ func _cmd_label(cmd: String) -> String:
 		"TURN_LEFT":  return "GIRAR IZQ"
 		"TURN_RIGHT": return "GIRAR DER"
 		"INTERACT":   return "INTERACTUAR"
+		"SONDEAR":    return "SONDEAR"
 		_:            return cmd

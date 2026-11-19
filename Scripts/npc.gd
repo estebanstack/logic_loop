@@ -8,6 +8,10 @@ extends CharacterBody2D
 # Estados de la Máquina de Estados Finita del Bot
 enum State { PATROL, CHASE, SEARCH }
 
+# Modo táctico durante el encuentro en la cobertura (juego de inspección):
+# NONE = normal | SWEEP = Barrido Intensivo | PATROL = Patrulla Rápida
+enum CoverMode { NONE, SWEEP, PATROL }
+
 # Radio de visión
 @export var vision_radius: float = 250.0
 
@@ -40,6 +44,13 @@ var calculated_velocity: Vector2 = Vector2.ZERO
 var current_action_description: String = "ESPERANDO EJECUCIÓN"
 var current_target_string: String = "NO DETECTADO"
 
+# Estado del modo de cobertura (ventana temporal ordenada por Main)
+var cover_mode: CoverMode = CoverMode.NONE
+var cover_time_left: float = 0.0
+var cover_clock: float = 0.0
+const COVER_PATROL_SPEED_MULT: float = 1.3
+var barrier_position: Vector2 = Vector2(470, 408)
+
 @onready var state_label: Label = get_node_or_null("StateLabel")
 
 func _ready() -> void:
@@ -51,7 +62,35 @@ func _draw() -> void:
 	draw_circle(Vector2.ZERO, vision_radius, Color(0.2, 0.6, 1.0, 0.12))
 	draw_arc(Vector2.ZERO, vision_radius, 0, TAU, 64, Color(0.2, 0.6, 1.0, 0.4), 2.0)
 
-func _physics_process(_delta: float) -> void:
+	# Conos tácticos de la ventana de cobertura
+	match cover_mode:
+		CoverMode.SWEEP:
+			# Cono naranja-rojo de 45° que oscila apuntando hacia la barrera
+			var aim: float = (barrier_position - global_position).angle() + sin(cover_clock * 3.0) * 0.35
+			_draw_cone(aim, deg_to_rad(45.0), Color(1.0, 0.35, 0.1, 0.35))
+		CoverMode.PATROL:
+			# Cono azul ancho (120°) hacia donde se desplaza
+			var heading: float = calculated_velocity.angle() if calculated_velocity != Vector2.ZERO else 0.0
+			_draw_cone(heading, deg_to_rad(120.0), Color(0.2, 0.5, 1.0, 0.30))
+
+# Sector circular de ángulo `width` centrado en `aim` (coordenadas locales del bot)
+func _draw_cone(aim: float, width: float, color: Color) -> void:
+	var points: PackedVector2Array = PackedVector2Array([Vector2.ZERO])
+	var steps: int = 16
+	for i in range(steps + 1):
+		var a: float = aim - width / 2.0 + width * float(i) / float(steps)
+		points.append(Vector2.from_angle(a) * vision_radius)
+	draw_colored_polygon(points, color)
+
+func _physics_process(delta: float) -> void:
+	# Cuenta atrás de la ventana de cobertura
+	if cover_mode != CoverMode.NONE:
+		cover_clock += delta
+		cover_time_left -= delta
+		if cover_time_left <= 0.0:
+			cover_mode = CoverMode.NONE
+		queue_redraw()
+
 	# 1. PERCIBIR (PERCEIVE)
 	# Consulta a Main para obtener datos de Spark y el estado de simulación.
 	perceive()
@@ -98,6 +137,11 @@ func perceive() -> void:
 		distance_to_spark = 0.0
 
 	patrol_waypoints = perceived_environment.get("patrol_waypoints", [])
+	barrier_position = perceived_environment.get("barrier_position", barrier_position)
+
+	# Spark camuflado en la cobertura: el bot no lo percibe aunque esté a rango
+	if perceived_environment.get("spark_hidden", false):
+		spark_in_vision = false
 
 # 2. TOMA DE DECISIONES Y TRANSICIONES DE ESTADO
 func decide() -> void:
@@ -155,11 +199,27 @@ func _decide_patrol() -> void:
 			target_waypoint = patrol_waypoints[current_waypoint_index]
 			
 		var direction: Vector2 = global_position.direction_to(target_waypoint)
-		calculated_velocity = direction * patrol_speed
+		var speed_mult: float = COVER_PATROL_SPEED_MULT if cover_mode == CoverMode.PATROL else 1.0
+		calculated_velocity = direction * patrol_speed * speed_mult
 		current_action_description = "PATRULLANDO ESTACIÓN (PUNTO %d)" % (current_waypoint_index + 1)
 	else:
 		calculated_velocity = Vector2.ZERO
 		current_action_description = "PATRULLANDO (EN ESPERA)"
+
+# Orden de Main (resultado del juego en cobertura): ir a la posición dada.
+# Usa BÚSQUEDA (misma velocidad de persecución) y no PERSEGUIR: si no ve a Spark,
+# PERSEGUIR dispararía de inmediato "SPARK PERDIDO" y taparía el banner del evento.
+func force_chase(pos: Vector2) -> void:
+	last_known_spark_position = pos
+	current_state = State.SEARCH
+	prev_state = State.SEARCH
+
+# Activa un modo táctico (CoverMode) durante `duration` segundos
+func set_cover_mode(mode: int, duration: float) -> void:
+	cover_mode = mode as CoverMode
+	cover_time_left = duration
+	cover_clock = 0.0
+	queue_redraw()
 
 # Evento de juego: Spark es capturado por el Bot (GAME OVER)
 func _handle_catch_spark() -> void:
@@ -190,6 +250,9 @@ func reset_to_start() -> void:
 	current_state = State.PATROL
 	current_waypoint_index = 0
 	last_known_spark_position = Vector2.ZERO
+	cover_mode = CoverMode.NONE
+	cover_time_left = 0.0
+	queue_redraw()
 	calculated_velocity = Vector2.ZERO
 	velocity = Vector2.ZERO
 	if state_label:

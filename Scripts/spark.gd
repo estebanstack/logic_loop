@@ -7,6 +7,8 @@ extends CharacterBody2D
 # - GIRAR IZQ   → Gira -90°
 # - GIRAR DER   → Gira +90°
 # - INTERACTUAR → Intenta recolectar el componente de reparación
+# - SONDEAR     → Emite pulsos de eco contra la barrera dañada (HMM) y decide
+#                 FRACTURAR o RODEAR por su cuenta
 #
 # Integra el paradigma de SISTEMAS DINÁMICOS (Stock & Flow):
 # - Stock: Batería / Nivel de Energía acumulada
@@ -40,6 +42,20 @@ var motor_step_cost: float = 4.0        # Consumo por acción de motor (-4.0 %/p
 var has_tool: bool = false
 @onready var tool_indicator: Node2D = get_node_or_null("ToolSprite")
 
+# Camino programado (casillas) que Spark recorre solo, una por paso, antes de
+# retomar el programa (resultado de SONDEAR: ruta de embestida o de desvío)
+var auto_path: Array[Vector2] = []
+
+# Aturdimiento por choque contra un muro blindado (pausa el temporizador de pasos)
+var stun_time_left: float = 0.0
+
+# Camuflaje térmico (cobertura del juego de inspección)
+const CAMO_ALPHA: float = 0.35
+var is_camouflaged: bool = false
+@onready var sprite: Sprite2D = get_node_or_null("Sprite2D")
+@onready var spark_label: Label = get_node_or_null("SparkLabel")
+@onready var rush_trail: CPUParticles2D = get_node_or_null("RushTrail")
+
 func _ready() -> void:
 	start_position = global_position
 	start_direction = facing_direction
@@ -59,6 +75,11 @@ func _physics_process(delta: float) -> void:
 	# Falla por agotamiento energético
 	if energy_stock <= 0.0:
 		_handle_battery_depleted()
+		return
+
+	# Aturdido: la energía sigue fluyendo, pero no avanza el programa
+	if stun_time_left > 0.0:
+		stun_time_left -= delta
 		return
 
 	step_timer += delta
@@ -93,6 +114,14 @@ func execute_program() -> void:
 
 # Ejecuta el siguiente comando en la cola y actualiza el indicador de progreso
 func _execute_next_step() -> void:
+	# Un camino programado por SONDEAR tiene prioridad sobre el programa
+	if auto_path.size() > 0:
+		energy_stock = max(0.0, energy_stock - motor_step_cost)
+		global_position = auto_path.pop_front()
+		_notify_dynamics_update(solar_inflow_rate - base_outflow_rate)
+		_notify_position()
+		return
+
 	if current_step_index >= command_queue.size():
 		is_executing = false
 		_notify_sequence_update()
@@ -105,7 +134,7 @@ func _execute_next_step() -> void:
 	current_step_index += 1
 
 	# Consumo del sistema dinámico por activación de motores
-	if current_cmd in ["MOVE", "TURN_LEFT", "TURN_RIGHT"]:
+	if current_cmd in ["MOVE", "TURN_LEFT", "TURN_RIGHT", "SONDEAR"]:
 		energy_stock = max(0.0, energy_stock - motor_step_cost)
 
 	# Actualiza el indicador visual ANTES de ejecutar el comando
@@ -121,9 +150,27 @@ func _execute_next_step() -> void:
 			_cmd_turn_right()
 		"INTERACT":
 			_cmd_interact()
+		"SONDEAR":
+			_cmd_probe()
+	_notify_position()
 
 func _cmd_move() -> void:
-	global_position += _get_direction_vector() * grid_size
+	var target: Vector2 = global_position + _get_direction_vector() * grid_size
+	# Los muros son un conjunto lógico de casillas (Spark se teletransporta por la
+	# cuadrícula, no usa move_and_slide): si está bloqueada, choca y se queda
+	# en su sitio, pero la energía del paso ya se gastó.
+	var environment = get_parent()
+	if environment and environment.has_method("is_cell_blocked") and environment.is_cell_blocked(target):
+		if environment.has_method("notify_execution_status"):
+			environment.notify_execution_status("Spark chocó contra un obstáculo")
+		return
+	global_position = target
+
+# SONDEAR: pide a Main el diagnóstico de la barrera que tiene al frente
+func _cmd_probe() -> void:
+	var environment = get_parent()
+	if environment and environment.has_method("run_obstacle_probe"):
+		environment.run_obstacle_probe(global_position, facing_direction)
 
 func _cmd_turn_left() -> void:
 	facing_direction = (facing_direction - 1 + 4) % 4
@@ -151,6 +198,9 @@ func stop_execution() -> void:
 
 func reset_to_start() -> void:
 	stop_execution()
+	auto_path.clear()
+	stun_time_left = 0.0
+	set_camouflaged(false)
 	global_position = start_position
 	facing_direction = start_direction
 	energy_stock = max_energy
@@ -163,6 +213,42 @@ func set_has_tool(value: bool) -> void:
 	has_tool = value
 	if tool_indicator:
 		tool_indicator.visible = value
+
+# --- EFECTOS DE LA BARRERA Y LA COBERTURA (los ordena Main) ---
+
+# Carga un camino de casillas que se recorre un paso por step_delay
+func follow_path(path: Array[Vector2]) -> void:
+	auto_path = path.duplicate()
+
+func stun(seconds: float) -> void:
+	stun_time_left = seconds
+
+func drain_energy(amount: float) -> void:
+	energy_stock = max(0.0, energy_stock - amount)
+	_notify_dynamics_update(solar_inflow_rate - base_outflow_rate)
+
+func add_energy(amount: float) -> void:
+	energy_stock = min(max_energy, energy_stock + amount)
+	_notify_dynamics_update(solar_inflow_rate - base_outflow_rate)
+
+# Camuflaje: sprite casi transparente, contorno cian y etiqueta [CAMUFLADO]
+func set_camouflaged(on: bool) -> void:
+	is_camouflaged = on
+	if sprite:
+		sprite.modulate.a = CAMO_ALPHA if on else 1.0
+	if spark_label:
+		spark_label.text = "Spark [CAMUFLADO]" if on else "Spark (Dron)"
+	queue_redraw()
+
+# Estela corta de propulsores al avanzar a toda velocidad (AVANZAR / Rush)
+func play_rush_trail() -> void:
+	if rush_trail:
+		rush_trail.restart()
+		rush_trail.emitting = true
+
+func _draw() -> void:
+	if is_camouflaged:
+		draw_arc(Vector2.ZERO, 26.0, 0.0, TAU, 32, Color(0.2, 0.9, 1.0, 0.9), 2.0)
 
 func _get_direction_vector() -> Vector2:
 	match facing_direction:
@@ -180,6 +266,12 @@ func _notify_sequence_update() -> void:
 	var environment = get_parent()
 	if environment and environment.has_method("update_program_sequence_ui"):
 		environment.update_program_sequence_ui(command_queue, current_step_index, is_executing)
+
+# Notifica a Main la posición tras cada paso (dispara el encuentro en la cobertura)
+func _notify_position() -> void:
+	var environment = get_parent()
+	if environment and environment.has_method("on_spark_stepped"):
+		environment.on_spark_stepped(global_position)
 
 # Notifica a Main los valores continuos del sistema dinámico de energía
 func _notify_dynamics_update(net_rate: float) -> void:

@@ -55,6 +55,7 @@
 4. **Matriz de Transición de Estados ($A$):**
    La integridad física del muro es una propiedad latente cuasi-estacionaria. Si se modela fatiga por pulsos de micro-impacto:
    $$A = \begin{pmatrix} 0.95 & 0.05 \\ 0.00 & 1.00 \end{pmatrix} \quad \text{o en reposo } A = \begin{pmatrix} 1.0 & 0.0 \\ 0.0 & 1.0 \end{pmatrix}$$
+   **Valor implementado: $A = I$ (muro en reposo).** Con $A = I$ el filtro Forward se reduce a Bayes secuencial y es fácil de defender. La variante de fatiga $0.95/0.05$ dejaría que sondear endurezca el muro, lo cual no tiene sentido físico.
 
 5. **Distribución Inicial ($\pi_0$):**
    Prior uniforme o basado en especificación de la estación:
@@ -67,13 +68,23 @@ $$\alpha_t(j) = P(Y_t \mid X_t = s_j) \sum_{i=1}^N \alpha_{t-1}(i) A_{ij}$$
 Normalizado:
 $$P(X_t = \text{FRÁGIL} \mid Y_{1:t}) = \frac{\alpha_t(\text{Frágil})}{\alpha_t(\text{Frágil}) + \alpha_t(\text{Blindado})}$$
 
+### 2.2.1 Valores implementados (versión del código)
+
+- **Geometría** (cuadrícula de Spark, $x = 150 + 64i$, $y = 600 - 64j$): barrera en $(470, 408)$, en la fila del dispensador; muro en toda la columna $x = 470$ salvo la barrera y un único hueco en $y = 536$. Casilla de cobertura $(406, 408)$ al oeste y casilla de salida $(534, 408)$ al este.
+- **Pasos:** embestir cuesta $2$ movimientos (barrera y salida); el desvío cuesta $6$ (abajo $2$, derecha $2$, arriba $2$).
+- **Comando `SONDEAR`:** Spark lo ejecuta en la casilla de cobertura mirando al este. Emite $3$ pulsos, filtra con Forward y aplica $\theta = 0.65$; decide solo entre `FRACTURAR` y `RODEAR`. Cuesta un paso de motor.
+- **Rebote contra blindaje:** $-15\%$ de batería, $1$ s de aturdimiento, alerta al Bot.
+- **Muros y Bot:** los muros son casillas lógicas que bloquean solo a Spark. El Bot se mueve en línea recta sin pathfinding, así que la barrera es un obstáculo terrestre y el Bot flota por encima.
+- **Cobertura:** el encuentro se juega una vez por corrida, la primera vez que Spark pisa la casilla de cobertura, con $p^* = 7/12$ y $q^* = 1/2$ como probabilidades de muestreo. Efecto de $3$ s. La **evasión limpia** da $+10\%$ de batería (monto elegido por nosotros; el enunciado no lo fija). El camuflaje usa $\alpha = 0.35$ (el documento menciona $0.4$ en el paso 4; se eligió $0.35$, el valor de §4).
+- **Precisión medida (Monte Carlo, $2000$ muros, $3$ pulsos, semilla fija):** $95.5\%$ de decisiones correctas; embiste un blindado el $1.7\%$ de las veces y rodea un frágil el $7.2\%$.
+
 ### 2.3 Mecánica y Función de Pago de la Decisión en Juego
 Spark tiene dos alternativas de navegación frente a la barrera:
 1. **Acción `FRACTURAR` (Embestida con pulso de choque, costo: 1 turno/paso):**
-   - **Si el muro es realmente FRÁGIL:** El muro colapsa en escombros (animación de rotura/desintegración). El camino directo queda abierto. Spark ahorra $6$ pasos de navegación y un $25\%$ de batería.
+   - **Si el muro es realmente FRÁGIL:** El muro colapsa en escombros (animación de rotura/desintegración). El camino directo queda abierto. Spark ahorra $4$ pasos de navegación ($6 - 2$) y cerca de un $16\%$ de batería ($4\%$ por paso).
    - **Si el muro es BLINDADO / INDESTRUCTIBLE:** El impacto rebota contra el blindaje. Spark sufre un daño por choque ($-15\%$ de batería), queda aturdido $1$ segundo y el estruendo acústico alerta inmediatamente al Bot de Mantenimiento (`notify_spark_detected()`).
-2. **Acción `RODEAR` (Desvío por el perímetro exterior, costo: 7 pasos):**
-   - Garantiza no colisionar, pero consume $25\%$ extra de energía y obliga a atravesar el sector donde patrulla activamente el Bot.
+2. **Acción `RODEAR` (Desvío por el hueco del muro, costo: 6 pasos):**
+   - Garantiza no colisionar, pero consume cerca de $16\%$ extra de energía ($6$ pasos frente a $2$, a $4\%$ por paso).
 
 **Regla de decisión racional:**
 $$\text{Decidir FRACTURAR} \iff P(X_t = \text{FRÁGIL} \mid Y_{1:t}) \ge \theta_{\text{umbral}} \approx 0.65$$
@@ -232,7 +243,7 @@ En un examen oral o defensa frente al profesor, Esteban puede explicar la totali
 ## 7. Plan de Implementación Paso a Paso
 
 1. **Paso 1: Nodo `DamagedBarrier` en `Scenes/main.tscn`**
-   - Añadir nodo de barrera en el corredor intermedio (aprox. `Vector2(450, 420)` o bloqueando el paso directo al dispensador/reparación).
+   - Añadir nodo de barrera en el corredor intermedio (implementado en `Vector2(470, 408)`, ver §2.2.1).
    - Variables exportadas: `is_breakable: bool`, `is_destroyed: bool`.
 
 2. **Paso 2: Actualizar `hidden_markov_model.gd`**
@@ -245,7 +256,7 @@ En un examen oral o defensa frente al profesor, Esteban puede explicar la totali
 
 4. **Paso 4: Actualizar `main.gd` y Señales Visuales**
    - Detectar proximidad de Spark al obstáculo.
-   - Desencadenar la interacción estratégica y actualizar visualmente la transparencia de Spark (`modulate.a = 0.4`), el color del cono del Bot y el banner notorio (`DetectionBanner`).
+   - Desencadenar la interacción estratégica y actualizar visualmente la transparencia de Spark (`modulate.a = 0.35`), el color del cono del Bot y el banner notorio (`DetectionBanner`).
 
 5. **Paso 5: Pruebas y Validación**
    - Ejecutar la simulación, verificar estabilidad matemática en consola y fluidez gráfica a 60 FPS.

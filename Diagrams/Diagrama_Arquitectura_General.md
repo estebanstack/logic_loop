@@ -173,3 +173,17 @@ graph LR
     PayoffMatrix --> StrategicModifiers["Modificadores en Simulación: Costo de Motores y Radio de Visión"]
 ```
 
+## 7. Extensión: Barrera Dañada (HMM de obstáculo + Juego de Cobertura)
+
+Nodos añadidos a `main.tscn` (Main sigue siendo el mediador; ningún nodo nuevo conoce a Spark ni al Bot):
+
+| Nodo | Script | Función |
+|:---|:---|:---|
+| `Walls` | `walls.gd` | Dibuja las casillas de muro que Main declara bloqueadas (solo visual). |
+| `DamagedBarrier` | `damaged_barrier.gd` | Bloque agrietado; `destroy()` / `restore()`; muestra ecos y $P(\text{Frágil})$. |
+| `ObstacleHMM` | `hidden_markov_model.gd` | Segunda instancia del HMM, con $N = 2$ (FRÁGIL, BLINDADO) y $A = I$. |
+| `CoverGameEngine` | `game_theory.gd` | Segunda instancia del motor de juegos, con el preset `STEALTH_COVER`. |
+
+- Spark gana el comando `SONDEAR`, que llama a `Main.run_obstacle_probe()`.
+- Los muros solo bloquean a Spark (conjunto lógico de casillas, `Main.is_cell_blocked()`); el Bot no se bloquea.
+- Detalle de valores y geometría: `Mejoras_HMM_Teoria_de_Juegos.md`, §2.2.1.

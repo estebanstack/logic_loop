@@ -2,6 +2,9 @@ extends Control
 
 # BAHÍA LOGÍSTICA DE LA ESTACIÓN (SIMULACIÓN DE EVENTOS DISCRETOS)
 # Modela una cola FIFO finita (M/M/1/K) con eventos discretos de llegada y servicio.
+# Llegadas Poisson con λ = 1/1.8 ≈ 0.556 /s y servicio exponencial con μ = 1/2.4 ≈ 0.417 /s,
+# es decir, tiempos entre eventos exponenciales con medias 1.8 s y 2.4 s.
+# Intensidad de tráfico ρ = λ/μ = 0.75. K = max_capacity = 8.
 
 var queue_array: Array = []
 var max_capacity: int = 8
@@ -16,6 +19,13 @@ var total_served: int = 0
 @onready var status_label: Label = _find_status_label()
 
 var crate_texture: Texture2D = null
+
+const ARRIVAL_RATE: float = 1.0 / 1.8   # λ (llegadas por segundo)
+const SERVICE_RATE: float = 1.0 / 2.4   # μ (servicios por segundo)
+
+# Muestra de una Exponencial(rate) por el método de la transformada inversa
+func _exp_sample(rate: float) -> float:
+	return -log(1.0 - randf()) / rate
 
 func _find_conveyor_belt() -> HBoxContainer:
 	if has_node("Margin/VBox/ConveyorBelt"):
@@ -44,17 +54,19 @@ func _ready() -> void:
 	if not service_timer:
 		service_timer = get_node_or_null("ServiceTimer")
 
+	# one_shot: cada timeout reprograma el temporizador con una muestra nueva
 	if arrival_timer:
-		arrival_timer.wait_time = 1.8
-		arrival_timer.start()
+		arrival_timer.one_shot = true
+		arrival_timer.start(_exp_sample(ARRIVAL_RATE))
 	if service_timer:
-		service_timer.wait_time = 2.4
-		service_timer.start()
+		service_timer.one_shot = true
+		service_timer.start(_exp_sample(SERVICE_RATE))
 	
 	update_ui()
 
 # EVENTO DISCRETO 1: LLEGADA DE HERRAMIENTA A LA CINTA
 func _on_arrival_timer_timeout() -> void:
+	arrival_timer.start(_exp_sample(ARRIVAL_RATE))
 	if queue_array.size() < max_capacity:
 		total_arrivals += 1
 		var item: Control
@@ -83,6 +95,7 @@ func _on_arrival_timer_timeout() -> void:
 
 # EVENTO DISCRETO 2: SERVICIO / DESPACHO DE HERRAMIENTA
 func _on_service_timer_timeout() -> void:
+	service_timer.start(_exp_sample(SERVICE_RATE))
 	if queue_array.size() > 0:
 		total_served += 1
 		var processed_box = queue_array.pop_front()
@@ -114,9 +127,9 @@ func reset_queue() -> void:
 	total_served = 0
 	update_ui()
 	if arrival_timer:
-		arrival_timer.start()
+		arrival_timer.start(_exp_sample(ARRIVAL_RATE))
 	if service_timer:
-		service_timer.start()
+		service_timer.start(_exp_sample(SERVICE_RATE))
 
 func update_ui() -> void:
 	if not status_label:

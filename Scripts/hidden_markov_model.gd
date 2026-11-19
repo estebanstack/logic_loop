@@ -29,6 +29,9 @@ enum Observation { GREEN_NOMINAL = 0, YELLOW_VIBRATION = 1, RED_ALARM = 2 }
 @export var hidden_state_names: Array[String] = ["ÓPTIMO", "DEGRADADO", "CRÍTICO"]
 @export var observation_names: Array[String] = ["VERDE (Nominal)", "AMARILLO (Vibración)", "ROJO (Alarma)"]
 
+# Si es false, emit_telemetry_pulse no recalcula Viterbi (la barrera no lo usa)
+@export var auto_viterbi: bool = true
+
 # Matriz A de transición entre estados ocultos (3x3)
 var hidden_transition_A: Array = [
 	[0.75, 0.20, 0.05],
@@ -77,12 +80,14 @@ func emit_telemetry_pulse() -> int:
 	# 3. Paso del Algoritmo Forward (Filtrado predictivo)
 	current_belief = _step_forward_belief(obs)
 	
-	# 4. Decodificación Viterbi acumulada
-	viterbi_decoded_history = viterbi_decode(observation_history)
+	# 4. Decodificación Viterbi acumulada (se omite si auto_viterbi = false)
+	if auto_viterbi:
+		viterbi_decoded_history = viterbi_decode(observation_history)
 	
 	var obs_name: String = observation_names[obs]
 	telemetry_emitted.emit(obs, obs_name, current_true_hidden_state, current_belief)
-	viterbi_decoded.emit(viterbi_decoded_history, observation_history)
+	if auto_viterbi:
+		viterbi_decoded.emit(viterbi_decoded_history, observation_history)
 	
 	return obs
 
@@ -138,9 +143,15 @@ func viterbi_decode(obs_sequence: Array = []) -> Array[int]:
 		backpointers.append(b_row)
 	
 	# 1. Inicialización en t = 0
+	# La primera observación se emite tras UNA transición (igual que en el filtro
+	# Forward y en emit_telemetry_pulse), así que se usa el prior predicho
+	# prior_j = Σ_i π0(i)·A[i][j] en lugar de π0 directamente.
 	var first_obs: int = obs_sequence[0]
 	for j in range(n_states):
-		var p_prior: float = max(1e-12, initial_pi[j])
+		var predicted_prior: float = 0.0
+		for i in range(n_states):
+			predicted_prior += initial_pi[i] * float(hidden_transition_A[i][j])
+		var p_prior: float = max(1e-12, predicted_prior)
 		var p_emiss: float = max(1e-12, float(emission_matrix_B[j][first_obs]))
 		viterbi_table[0][j] = log(p_prior) + log(p_emiss)
 		backpointers[0][j] = 0
@@ -213,3 +224,44 @@ func reset_hmm() -> void:
 	observation_history.clear()
 	true_hidden_history.clear()
 	viterbi_decoded_history.clear()
+
+# ==============================================================================
+# EXTENSIÓN: HMM DE LA BARRERA DAÑADA (SEGUNDA INSTANCIA, N = 2 ESTADOS)
+# ==============================================================================
+# El mismo motor sirve para otro modelo λ = (A, B, π0). Los métodos Forward,
+# Viterbi y de emisión ya son genéricos en N, así que solo se reemplazan las
+# matrices. Los valores por defecto de telemetría (3 estados) NO se modifican.
+
+# Reemplaza λ = (A, B, π0) y los nombres de estados/observaciones, y reinicia.
+func configure(state_names: Array, obs_names: Array, a_matrix: Array, b_matrix: Array, pi: Array) -> void:
+	hidden_state_names.clear()
+	for s in state_names:
+		hidden_state_names.append(str(s))
+	observation_names.clear()
+	for o in obs_names:
+		observation_names.append(str(o))
+	hidden_transition_A = a_matrix.duplicate(true)
+	emission_matrix_B = b_matrix.duplicate(true)
+	initial_pi.clear()
+	for p in pi:
+		initial_pi.append(float(p))
+	reset_hmm()
+
+# Sortea el estado oculto verdadero desde π0 (p. ej. al iniciar cada corrida)
+func resample_true_state() -> void:
+	current_true_hidden_state = _sample_from_row(initial_pi)
+
+# Diagnóstico de la barrera: emite `pulses` ecos, filtra con Forward y aplica
+# la regla de decisión P(estado 0 | Y_{1:t}) >= umbral  →  FRACTURAR, si no RODEAR.
+# Convención del modelo de la barrera: estado 0 = FRÁGIL, estado 1 = BLINDADO.
+func diagnose_obstacle(pulses: int = 3, threshold: float = 0.65) -> Dictionary:
+	var echoes: Array[int] = []
+	for i in range(pulses):
+		echoes.append(emit_telemetry_pulse())
+	var belief_fragil: float = current_belief[0]
+	return {
+		"observations": echoes,
+		"belief_fragil": belief_fragil,
+		"decision": "FRACTURAR" if belief_fragil >= threshold else "RODEAR",
+		"true_state": current_true_hidden_state
+	}

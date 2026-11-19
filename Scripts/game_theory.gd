@@ -20,7 +20,7 @@ class_name GameTheoryEngine
 signal round_resolved(round_data: Dictionary)
 signal preset_changed(preset_name: String)
 
-enum PresetType { HAWK_DOVE = 0, PRISONERS_DILEMMA = 1, COORDINATION = 2 }
+enum PresetType { HAWK_DOVE = 0, PRISONERS_DILEMMA = 1, COORDINATION = 2, STEALTH_COVER = 3 }
 
 @export var p1_name: String = "Spark"
 @export var p2_name: String = "Bot"
@@ -81,6 +81,18 @@ func load_preset(preset: PresetType) -> void:
 				[Vector2(4.0, 4.0), Vector2(0.0, 0.0)],
 				[Vector2(0.0, 0.0), Vector2(2.0, 2.0)]
 			]
+		PresetType.STEALTH_COVER:
+			# Juego de Inspección en la barrera dañada (ventaja asimétrica del Bot)
+			# Spark: [OCULTARSE, AVANZAR] | Bot: [BARRIDO INTENSIVO, PATRULLA RÁPIDA]
+			# (Ocultarse, Barrido): (-3,4) | (Ocultarse, Patrulla): (3,-1)
+			# (Avanzar, Barrido):   (4,-2) | (Avanzar, Patrulla):   (-4,5)
+			# Sin Nash puro; mixto: p* = 7/12 = P(Ocultarse), q* = 1/2 = P(Barrido)
+			p1_action_names = ["OCULTARSE", "AVANZAR"]
+			p2_action_names = ["BARRIDO INTENSIVO", "PATRULLA RÁPIDA"]
+			payoff_matrix = [
+				[Vector2(-3.0, 4.0), Vector2(3.0, -1.0)],
+				[Vector2(4.0, -2.0), Vector2(-4.0, 5.0)]
+			]
 	
 	preset_changed.emit(get_preset_name())
 
@@ -92,6 +104,8 @@ func get_preset_name() -> String:
 			return "Dilema del Prisionero"
 		PresetType.COORDINATION:
 			return "Juego de Coordinación"
+		PresetType.STEALTH_COVER:
+			return "Sigilo en Cobertura / Juego de Inspección"
 		_:
 			return "Personalizado"
 
