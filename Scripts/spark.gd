@@ -56,9 +56,19 @@ var is_camouflaged: bool = false
 @onready var spark_label: Label = get_node_or_null("SparkLabel")
 @onready var rush_trail: CPUParticles2D = get_node_or_null("RushTrail")
 
+# Movimiento suave SOLO visual: la lógica mueve global_position al instante y los
+# elementos visuales arrancan desplazados -Δ y vuelven a 0 en SLIDE_TIME segundos.
+# Ninguna regla del juego lee este desplazamiento.
+const SLIDE_TIME: float = 0.18
+const TOOL_BASE_POS: Vector2 = Vector2(0, -22)
+var _prev_position: Vector2 = Vector2.ZERO
+var _visual_offset: Vector2 = Vector2.ZERO
+var _slide_tween: Tween = null
+
 func _ready() -> void:
 	start_position = global_position
 	start_direction = facing_direction
+	_prev_position = global_position
 	_update_rotation()
 	_notify_dynamics_update(0.0)
 
@@ -110,7 +120,7 @@ func execute_program() -> void:
 	_notify_sequence_update()
 	var environment = get_parent()
 	if environment and environment.has_method("notify_execution_status"):
-		environment.notify_execution_status("▶  EJECUTANDO PROGRAMA...")
+		environment.notify_execution_status("EJECUTANDO PROGRAMA...")
 
 # Ejecuta el siguiente comando en la cola y actualiza el indicador de progreso
 func _execute_next_step() -> void:
@@ -202,6 +212,10 @@ func reset_to_start() -> void:
 	stun_time_left = 0.0
 	set_camouflaged(false)
 	global_position = start_position
+	_prev_position = start_position
+	if _slide_tween and _slide_tween.is_valid():
+		_slide_tween.kill()
+	_set_visual_offset(Vector2.ZERO)
 	facing_direction = start_direction
 	energy_stock = max_energy
 	set_has_tool(false)
@@ -248,7 +262,7 @@ func play_rush_trail() -> void:
 
 func _draw() -> void:
 	if is_camouflaged:
-		draw_arc(Vector2.ZERO, 26.0, 0.0, TAU, 32, Color(0.2, 0.9, 1.0, 0.9), 2.0)
+		draw_arc(_visual_offset, 26.0, 0.0, TAU, 32, Color(0.2, 0.9, 1.0, 0.9), 2.0)
 
 func _get_direction_vector() -> Vector2:
 	match facing_direction:
@@ -258,8 +272,38 @@ func _get_direction_vector() -> Vector2:
 		3: return Vector2.UP
 		_: return Vector2.RIGHT
 
+# Solo el sprite (y la estela) giran con la dirección: la etiqueta, el icono de
+# herramienta y el anillo de camuflaje se quedan siempre derechos.
 func _update_rotation() -> void:
-	rotation = deg_to_rad(facing_direction * 90.0)
+	var angle: float = deg_to_rad(facing_direction * 90.0)
+	if sprite:
+		sprite.rotation = angle
+	if rush_trail:
+		rush_trail.rotation = angle
+
+# Aplica el desplazamiento visual a sprite, herramienta, etiqueta y anillo
+func _set_visual_offset(offset: Vector2) -> void:
+	_visual_offset = offset
+	if sprite:
+		sprite.position = offset
+	if tool_indicator:
+		tool_indicator.position = TOOL_BASE_POS + offset
+	if spark_label:
+		spark_label.position = Vector2(-50, 18) + offset
+	if is_camouflaged:
+		queue_redraw()
+
+# Tras un paso: el cuerpo ya está en la casilla nueva, lo visual se desliza hasta ella
+func _slide_from_previous() -> void:
+	var delta_pos: Vector2 = _prev_position - global_position
+	_prev_position = global_position
+	if _slide_tween and _slide_tween.is_valid():
+		_slide_tween.kill()
+	if delta_pos == Vector2.ZERO:
+		return
+	_slide_tween = create_tween()
+	_slide_tween.tween_method(_set_visual_offset, delta_pos, Vector2.ZERO, SLIDE_TIME) \
+		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 
 # Notifica a Main para reconstruir la visualización del programa
 func _notify_sequence_update() -> void:
@@ -269,6 +313,7 @@ func _notify_sequence_update() -> void:
 
 # Notifica a Main la posición tras cada paso (dispara el encuentro en la cobertura)
 func _notify_position() -> void:
+	_slide_from_previous()
 	var environment = get_parent()
 	if environment and environment.has_method("on_spark_stepped"):
 		environment.on_spark_stepped(global_position)

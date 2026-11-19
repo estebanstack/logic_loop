@@ -53,7 +53,13 @@ var bayes: BayesSearch = null
 # Estrategia seleccionada actualmente para Spark en Teoría de Juegos (0=Cauto, 1=Audaz)
 var spark_chosen_strategy: int = 0
 
+# Títulos legibles de las pestañas (el orden coincide con los hijos del TabContainer)
+const TAB_TITLES: Array[String] = ["Markov", "HMM", "Teoría de Juegos", "IA Bayesiana"]
+
 func _ready() -> void:
+	if tab_container:
+		for i in range(mini(TAB_TITLES.size(), tab_container.get_tab_count())):
+			tab_container.set_tab_title(i, TAB_TITLES[i])
 	_connect_signals()
 
 func setup_engines(mc: MarkovChain, h: HiddenMarkovModel, gt: GameTheoryEngine, bs: BayesSearch = null) -> void:
@@ -169,9 +175,9 @@ func update_hmm_ui() -> void:
 	
 	# 1. Estado Verdadero (para validación del estudiante) y Observación
 	if hmm_hidden_label:
-		hmm_hidden_label.text = "Desgaste Oculto Real: [ %s ]" % hmm.get_true_state_name()
+		hmm_hidden_label.text = "Estado real (validación docente): %s" % hmm.get_true_state_name()
 	if hmm_obs_label:
-		hmm_obs_label.text = "Sensor Telemetría:    [ %s ]" % hmm.get_latest_observation_name()
+		hmm_obs_label.text = "Sensor de telemetría: %s" % hmm.get_latest_observation_name()
 		
 	# 2. Filtrado Forward (Belief state)
 	var belief: Array = hmm.current_belief
@@ -192,7 +198,7 @@ func update_hmm_ui() -> void:
 				var s_idx: int = hmm.viterbi_decoded_history[i]
 				var code: String = "ÓPT" if s_idx == 0 else ("DEG" if s_idx == 1 else "CRÍ")
 				vit_str += code + " "
-			hmm_viterbi_label.text = "Viterbi (últimos): [ %s] (T=%d)" % [vit_str, n_obs]
+			hmm_viterbi_label.text = "Viterbi (últimos): %s(T=%d)" % [vit_str, n_obs]
 
 func _on_hmm_telemetry_emitted(_obs: int, _name: String, _true_h: int, _belief: Array) -> void:
 	update_hmm_ui()

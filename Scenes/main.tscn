@@ -15,6 +15,7 @@
 [ext_resource type="Script" path="res://Scripts/damaged_barrier.gd" id="13_barrier_script"]
 [ext_resource type="Script" path="res://Scripts/walls.gd" id="14_walls_script"]
 [ext_resource type="Script" path="res://Scripts/bayes_search.gd" id="15_bayes_script"]
+[ext_resource type="Script" path="res://Scripts/space_floor.gd" id="16_floor_script"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_npc"]
 size = Vector2(40, 40)
@@ -28,6 +29,9 @@ size = Vector2(30, 30)
 [node name="Main" type="Node2D" unique_id=1209602406]
 script = ExtResource("1_main_script")
 
+[node name="SpaceFloor" type="Node2D" parent="."]
+script = ExtResource("16_floor_script")
+
 [node name="Walls" type="Node2D" parent="."]
 script = ExtResource("14_walls_script")
 
@@ -40,13 +44,13 @@ script = ExtResource("13_barrier_script")
 
 [node name="EchoLabel" type="Label" parent="DamagedBarrier"]
 visible = false
-offset_left = -90.0
-offset_top = -62.0
-offset_right = 90.0
+offset_left = -210.0
+offset_top = -68.0
+offset_right = 20.0
 offset_bottom = -34.0
 theme_override_colors/font_color = Color(1, 0.85, 0.4, 1)
 theme_override_font_sizes/font_size = 11
-horizontal_alignment = 1
+horizontal_alignment = 2
 vertical_alignment = 2
 
 [node name="Debris" type="CPUParticles2D" parent="DamagedBarrier"]
@@ -187,227 +191,335 @@ script = ExtResource("10_hmm_script")
 [node name="CoverGameEngine" type="Node" parent="."]
 script = ExtResource("11_gt_script")
 
-[node name="UI" type="CanvasLayer" parent="." unique_id=96624360]
+[node name="UI" type="CanvasLayer" parent="."]
 
-[node name="DetectionTimer" type="Timer" parent="UI" unique_id=1835382785]
+[node name="DetectionTimer" type="Timer" parent="UI"]
 one_shot = true
 
-[node name="DebugPanel" type="PanelContainer" parent="UI" unique_id=460082637]
-offset_left = 20.0
-offset_top = 20.0
-offset_right = 360.0
-offset_bottom = 200.0
+[node name="TopBar" type="PanelContainer" parent="UI"]
+offset_left = 8.0
+offset_top = 6.0
+offset_right = 790.0
+offset_bottom = 54.0
 
-[node name="Margin" type="MarginContainer" parent="UI/DebugPanel" unique_id=105804545]
+[node name="HBox" type="HBoxContainer" parent="UI/TopBar"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="EnergyBox" type="VBoxContainer" parent="UI/TopBar/HBox"]
+custom_minimum_size = Vector2(290, 0)
+layout_mode = 2
+alignment = 1
+theme_override_constants/separation = 1
+
+[node name="EnergyRow" type="HBoxContainer" parent="UI/TopBar/HBox/EnergyBox"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="EnergyValue" type="Label" parent="UI/TopBar/HBox/EnergyBox/EnergyRow"]
+custom_minimum_size = Vector2(110, 0)
+layout_mode = 2
+theme_type_variation = &"ValueLabel"
+text = "ENERGÍA 100%"
+
+[node name="EnergyBar" type="ProgressBar" parent="UI/TopBar/HBox/EnergyBox/EnergyRow"]
+custom_minimum_size = Vector2(0, 12)
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 4
+value = 100.0
+show_percentage = false
+
+[node name="DynamicsText" type="Label" parent="UI/TopBar/HBox/EnergyBox"]
+layout_mode = 2
+theme_type_variation = &"DimLabel"
+text = "Solar +1.0/s · Consumo −1.5/s · Neto −0.5/s"
+
+[node name="ClimateChip" type="PanelContainer" parent="UI/TopBar/HBox"]
+custom_minimum_size = Vector2(110, 0)
 layout_mode = 2
 
-[node name="VBox" type="VBoxContainer" parent="UI/DebugPanel/Margin" unique_id=214630802]
+[node name="VBox" type="VBoxContainer" parent="UI/TopBar/HBox/ClimateChip"]
+layout_mode = 2
+alignment = 1
+theme_override_constants/separation = 0
+
+[node name="Caption" type="Label" parent="UI/TopBar/HBox/ClimateChip/VBox"]
+layout_mode = 2
+theme_type_variation = &"DimLabel"
+text = "CLIMA · MARKOV"
+
+[node name="ClimateLabel" type="Label" parent="UI/TopBar/HBox/ClimateChip/VBox"]
+layout_mode = 2
+text = "ESTABLE"
+
+[node name="BotChip" type="PanelContainer" parent="UI/TopBar/HBox"]
+custom_minimum_size = Vector2(225, 0)
 layout_mode = 2
 
-[node name="AgentTitle" type="Label" parent="UI/DebugPanel/Margin/VBox" unique_id=2121041803]
+[node name="VBox" type="VBoxContainer" parent="UI/TopBar/HBox/BotChip"]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.5, 0.85, 1, 1)
-theme_override_font_sizes/font_size = 13
-text = "PARADIGMA 1: AGENTES (FSM & VISIÓN)"
+alignment = 1
+theme_override_constants/separation = 0
 
-[node name="StatusText" type="Label" parent="UI/DebugPanel/Margin/VBox" unique_id=1302799352]
+[node name="BotStateLabel" type="Label" parent="UI/TopBar/HBox/BotChip/VBox"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 12
-text = "Estado:    PATRULLA
-Objetivo:  NO DETECTADO
-Distancia: N/A
-Acción:    ESPERANDO EJECUCIÓN
-Visión:    250 px"
+text = "PATRULLA"
 
-[node name="DetectionBanner" type="Label" parent="UI/DebugPanel/Margin/VBox" unique_id=2073061971]
+[node name="StatusText" type="Label" parent="UI/TopBar/HBox/BotChip/VBox"]
+custom_minimum_size = Vector2(205, 0)
+layout_mode = 2
+theme_type_variation = &"DimLabel"
+text = "En espera del programa"
+text_overrun_behavior = 3
+
+[node name="ToolChip" type="PanelContainer" parent="UI/TopBar/HBox"]
+custom_minimum_size = Vector2(100, 0)
+layout_mode = 2
+
+[node name="VBox" type="VBoxContainer" parent="UI/TopBar/HBox/ToolChip"]
+layout_mode = 2
+alignment = 1
+theme_override_constants/separation = 0
+
+[node name="Caption" type="Label" parent="UI/TopBar/HBox/ToolChip/VBox"]
+layout_mode = 2
+theme_type_variation = &"DimLabel"
+text = "HERRAMIENTA"
+
+[node name="ToolLabel" type="Label" parent="UI/TopBar/HBox/ToolChip/VBox"]
+layout_mode = 2
+text = "NINGUNA"
+
+[node name="BannerPill" type="PanelContainer" parent="UI"]
 visible = false
+offset_left = 135.0
+offset_top = 60.0
+offset_right = 655.0
+offset_bottom = 88.0
+
+[node name="DetectionBanner" type="Label" parent="UI/BannerPill"]
+custom_minimum_size = Vector2(500, 0)
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 0.85, 0.1, 1)
-theme_override_font_sizes/font_size = 12
-text = "[!] ¡SPARK DETECTADO!"
+text = "¡SPARK DETECTADO!"
 horizontal_alignment = 1
-
-[node name="DynamicsPanel" type="PanelContainer" parent="UI" unique_id=1587421390]
-offset_left = 20.0
-offset_top = 215.0
-offset_right = 360.0
-offset_bottom = 365.0
-
-[node name="Margin" type="MarginContainer" parent="UI/DynamicsPanel"]
-layout_mode = 2
-
-[node name="VBox" type="VBoxContainer" parent="UI/DynamicsPanel/Margin"]
-layout_mode = 2
-theme_override_constants/separation = 4
-
-[node name="DynamicsTitle" type="Label" parent="UI/DynamicsPanel/Margin/VBox"]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.3, 0.95, 0.6, 1)
-theme_override_font_sizes/font_size = 13
-text = "PARADIGMA 3: SISTEMAS DINÁMICOS"
-
-[node name="EnergyBar" type="ProgressBar" parent="UI/DynamicsPanel/Margin/VBox"]
-custom_minimum_size = Vector2(0, 16)
-layout_mode = 2
-value = 100.0
-
-[node name="DynamicsText" type="Label" parent="UI/DynamicsPanel/Margin/VBox"]
-layout_mode = 2
-theme_override_font_sizes/font_size = 11
-text = "Stock (Energía): 100.0 %
-Inflow (Solar):   +1.0 %/s
-Outflow (Base):   -1.5 %/s
-Tasa Neta dE/dt:  -0.5 %/s
-Bucle: Balance continuo"
+autowrap_mode = 3
 
 [node name="QueueSimulator" parent="UI" instance=ExtResource("7_queue_sim")]
-offset_left = 380.0
-offset_top = 20.0
-offset_right = 820.0
-offset_bottom = 120.0
+offset_left = 8.0
+offset_top = 662.0
+offset_right = 508.0
+offset_bottom = 716.0
+
+[node name="FeedbackPanel" type="PanelContainer" parent="UI"]
+offset_left = 516.0
+offset_top = 662.0
+offset_right = 790.0
+offset_bottom = 716.0
+
+[node name="FeedbackText" type="Label" parent="UI/FeedbackPanel"]
+custom_minimum_size = Vector2(250, 0)
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+text = "Listo para programar"
+vertical_alignment = 1
+autowrap_mode = 3
 
 [node name="AdvancedModelsPanel" parent="UI" instance=ExtResource("12_models_panel")]
 offset_left = 800.0
-offset_top = 20.0
-offset_right = 1260.0
-offset_bottom = 395.0
+offset_top = 10.0
+offset_right = 1270.0
+offset_bottom = 400.0
 
-[node name="ProgrammingPanel" type="PanelContainer" parent="UI" unique_id=1140289537]
+[node name="ProgrammingPanel" type="PanelContainer" parent="UI"]
 offset_left = 800.0
 offset_top = 410.0
-offset_right = 1260.0
-offset_bottom = 700.0
+offset_right = 1270.0
+offset_bottom = 712.0
 
-[node name="Margin" type="MarginContainer" parent="UI/ProgrammingPanel" unique_id=2110914487]
+[node name="Margin" type="MarginContainer" parent="UI/ProgrammingPanel"]
 layout_mode = 2
 
-[node name="VBox" type="VBoxContainer" parent="UI/ProgrammingPanel/Margin" unique_id=1741814650]
+[node name="VBox" type="VBoxContainer" parent="UI/ProgrammingPanel/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="TitleRow" type="HBoxContainer" parent="UI/ProgrammingPanel/Margin/VBox"]
 layout_mode = 2
 
-[node name="ProgramTitle" type="Label" parent="UI/ProgrammingPanel/Margin/VBox" unique_id=1849796916]
+[node name="ProgramTitle" type="Label" parent="UI/ProgrammingPanel/Margin/VBox/TitleRow"]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.4, 1, 0.5, 1)
-theme_override_font_sizes/font_size = 13
-text = "PROGRAMA DE SPARK (LOGIC LOOP)"
+size_flags_horizontal = 3
+theme_type_variation = &"HeaderLabel"
+text = "PROGRAMA DE SPARK · LOGIC LOOP"
 
-[node name="ScrollList" type="ScrollContainer" parent="UI/ProgrammingPanel/Margin/VBox" unique_id=1879962613]
-custom_minimum_size = Vector2(0, 110)
+[node name="BtnMenu" type="Button" parent="UI/ProgrammingPanel/Margin/VBox/TitleRow"]
+layout_mode = 2
+text = "Menú"
+
+[node name="ScrollList" type="ScrollContainer" parent="UI/ProgrammingPanel/Margin/VBox"]
+custom_minimum_size = Vector2(0, 90)
+layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="ProgramList" type="Label" parent="UI/ProgrammingPanel/Margin/VBox/ScrollList"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Programa vacío: añade comandos"
+
+[node name="CommandsTitle" type="Label" parent="UI/ProgrammingPanel/Margin/VBox"]
+layout_mode = 2
+theme_type_variation = &"HeaderLabel"
+text = "COMANDOS"
+
+[node name="HBoxRow1" type="HBoxContainer" parent="UI/ProgrammingPanel/Margin/VBox"]
 layout_mode = 2
 
-[node name="ProgramList" type="Label" parent="UI/ProgrammingPanel/Margin/VBox/ScrollList" unique_id=2000461656]
+[node name="BtnMove" type="Button" parent="UI/ProgrammingPanel/Margin/VBox/HBoxRow1"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 12
-text = "[ Vacío — añade comandos ]"
+size_flags_horizontal = 3
+text = "MOVER"
 
-[node name="CommandsTitle" type="Label" parent="UI/ProgrammingPanel/Margin/VBox" unique_id=2097839023]
+[node name="BtnTurnLeft" type="Button" parent="UI/ProgrammingPanel/Margin/VBox/HBoxRow1"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 11
-text = "COMANDOS:"
+size_flags_horizontal = 3
+text = "GIRAR IZQ"
 
-[node name="HBoxRow1" type="HBoxContainer" parent="UI/ProgrammingPanel/Margin/VBox" unique_id=526772138]
+[node name="BtnTurnRight" type="Button" parent="UI/ProgrammingPanel/Margin/VBox/HBoxRow1"]
 layout_mode = 2
+size_flags_horizontal = 3
+text = "GIRAR DER"
 
-[node name="BtnMove" type="Button" parent="UI/ProgrammingPanel/Margin/VBox/HBoxRow1" unique_id=812815572]
+[node name="BtnInteract" type="Button" parent="UI/ProgrammingPanel/Margin/VBox/HBoxRow1"]
 layout_mode = 2
-text = " MOVER "
+size_flags_horizontal = 3
+text = "INTERACTUAR"
 
-[node name="BtnTurnLeft" type="Button" parent="UI/ProgrammingPanel/Margin/VBox/HBoxRow1" unique_id=1009321323]
-layout_mode = 2
-text = " GIRAR IZQ "
-
-[node name="BtnTurnRight" type="Button" parent="UI/ProgrammingPanel/Margin/VBox/HBoxRow1" unique_id=1134440165]
-layout_mode = 2
-text = " GIRAR DER "
-
-[node name="BtnInteract" type="Button" parent="UI/ProgrammingPanel/Margin/VBox/HBoxRow1" unique_id=579064236]
-layout_mode = 2
-text = " INTERACTUAR "
-
-[node name="HBoxRow2" type="HBoxContainer" parent="UI/ProgrammingPanel/Margin/VBox" unique_id=1835646305]
+[node name="HBoxRow2" type="HBoxContainer" parent="UI/ProgrammingPanel/Margin/VBox"]
 layout_mode = 2
 
 [node name="BtnSondear" type="Button" parent="UI/ProgrammingPanel/Margin/VBox/HBoxRow2"]
 layout_mode = 2
-text = " SONDEAR "
+size_flags_horizontal = 3
+text = "SONDEAR"
 
-[node name="BtnClear" type="Button" parent="UI/ProgrammingPanel/Margin/VBox/HBoxRow2" unique_id=391865236]
+[node name="BtnClear" type="Button" parent="UI/ProgrammingPanel/Margin/VBox/HBoxRow2"]
 layout_mode = 2
-text = " BORRAR TODO "
+size_flags_horizontal = 3
+text = "BORRAR TODO"
 
-[node name="BtnExecute" type="Button" parent="UI/ProgrammingPanel/Margin/VBox/HBoxRow2" unique_id=1955427396]
+[node name="BtnExecute" type="Button" parent="UI/ProgrammingPanel/Margin/VBox/HBoxRow2"]
 layout_mode = 2
-text = " EJECUTAR "
+size_flags_horizontal = 3
+theme_type_variation = &"PrimaryButton"
+text = "EJECUTAR"
 
-[node name="FeedbackText" type="Label" parent="UI/ProgrammingPanel/Margin/VBox" unique_id=961966090]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.85, 0.85, 0.85, 1)
-theme_override_font_sizes/font_size = 11
-text = "ESTADO: Listo para programar"
-
-[node name="GameOverModal" type="PanelContainer" parent="UI" unique_id=672476547]
+[node name="ModalBackdrop" type="ColorRect" parent="UI"]
 visible = false
-offset_left = 315.0
-offset_top = 240.0
-offset_right = 765.0
-offset_bottom = 440.0
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.02, 0.03, 0.06, 0.6)
 
-[node name="Margin" type="MarginContainer" parent="UI/GameOverModal" unique_id=940432820]
+[node name="GameOverModal" type="PanelContainer" parent="UI"]
+visible = false
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -230.0
+offset_top = -110.0
+offset_right = 230.0
+offset_bottom = 110.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Margin" type="MarginContainer" parent="UI/GameOverModal"]
 layout_mode = 2
+theme_override_constants/margin_left = 12
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 12
+theme_override_constants/margin_bottom = 10
 
-[node name="VBox" type="VBoxContainer" parent="UI/GameOverModal/Margin" unique_id=1273613150]
+[node name="VBox" type="VBoxContainer" parent="UI/GameOverModal/Margin"]
 layout_mode = 2
 alignment = 1
+theme_override_constants/separation = 12
 
-[node name="Title" type="Label" parent="UI/GameOverModal/Margin/VBox" unique_id=640219009]
+[node name="Title" type="Label" parent="UI/GameOverModal/Margin/VBox"]
 layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.25, 0.25, 1)
+theme_override_colors/font_color = Color(1, 0.36, 0.36, 1)
 theme_override_font_sizes/font_size = 22
 text = "¡GAME OVER!"
 horizontal_alignment = 1
 
-[node name="Msg" type="Label" parent="UI/GameOverModal/Margin/VBox" unique_id=1667109737]
+[node name="Msg" type="Label" parent="UI/GameOverModal/Margin/VBox"]
+custom_minimum_size = Vector2(420, 0)
 layout_mode = 2
-theme_override_font_sizes/font_size = 13
 text = "Spark fue capturado por el Bot de Mantenimiento.
 Modifica tu programa e inténtalo de nuevo."
 horizontal_alignment = 1
+autowrap_mode = 3
 
-[node name="BtnRetry" type="Button" parent="UI/GameOverModal/Margin/VBox" unique_id=1971707084]
+[node name="BtnRetry" type="Button" parent="UI/GameOverModal/Margin/VBox"]
+custom_minimum_size = Vector2(0, 36)
 layout_mode = 2
-text = " REINTENTAR "
+theme_type_variation = &"PrimaryButton"
+text = "REINTENTAR"
 
-[node name="VictoryModal" type="PanelContainer" parent="UI" unique_id=875752066]
+[node name="VictoryModal" type="PanelContainer" parent="UI"]
 visible = false
-offset_left = 315.0
-offset_top = 240.0
-offset_right = 765.0
-offset_bottom = 440.0
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -230.0
+offset_top = -110.0
+offset_right = 230.0
+offset_bottom = 110.0
+grow_horizontal = 2
+grow_vertical = 2
 
-[node name="Margin" type="MarginContainer" parent="UI/VictoryModal" unique_id=982245337]
+[node name="Margin" type="MarginContainer" parent="UI/VictoryModal"]
 layout_mode = 2
+theme_override_constants/margin_left = 12
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 12
+theme_override_constants/margin_bottom = 10
 
-[node name="VBox" type="VBoxContainer" parent="UI/VictoryModal/Margin" unique_id=1674868351]
+[node name="VBox" type="VBoxContainer" parent="UI/VictoryModal/Margin"]
 layout_mode = 2
 alignment = 1
+theme_override_constants/separation = 12
 
-[node name="Title" type="Label" parent="UI/VictoryModal/Margin/VBox" unique_id=589305456]
+[node name="Title" type="Label" parent="UI/VictoryModal/Margin/VBox"]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.2, 1, 0.4, 1)
+theme_override_colors/font_color = Color(0.24, 0.86, 0.52, 1)
 theme_override_font_sizes/font_size = 22
 text = "¡NIVEL COMPLETADO!"
 horizontal_alignment = 1
 
-[node name="Msg" type="Label" parent="UI/VictoryModal/Margin/VBox" unique_id=1063863121]
+[node name="Msg" type="Label" parent="UI/VictoryModal/Margin/VBox"]
+custom_minimum_size = Vector2(420, 0)
 layout_mode = 2
-theme_override_font_sizes/font_size = 13
 text = "¡Felicidades! Spark recolectó el Componente de Reparación sin ser detectado."
 horizontal_alignment = 1
+autowrap_mode = 3
 
-[node name="BtnReplay" type="Button" parent="UI/VictoryModal/Margin/VBox" unique_id=1552048646]
+[node name="BtnReplay" type="Button" parent="UI/VictoryModal/Margin/VBox"]
+custom_minimum_size = Vector2(0, 36)
 layout_mode = 2
-text = " REJUGAR "
+theme_type_variation = &"PrimaryButton"
+text = "REJUGAR"
 
 [connection signal="timeout" from="UI/DetectionTimer" to="." method="_on_detection_timer_timeout"]
+[connection signal="pressed" from="UI/ProgrammingPanel/Margin/VBox/TitleRow/BtnMenu" to="." method="_on_btn_menu_pressed"]
 [connection signal="pressed" from="UI/ProgrammingPanel/Margin/VBox/HBoxRow1/BtnMove" to="." method="_on_btn_move_pressed"]
 [connection signal="pressed" from="UI/ProgrammingPanel/Margin/VBox/HBoxRow1/BtnTurnLeft" to="." method="_on_btn_turn_left_pressed"]
 [connection signal="pressed" from="UI/ProgrammingPanel/Margin/VBox/HBoxRow1/BtnTurnRight" to="." method="_on_btn_turn_right_pressed"]

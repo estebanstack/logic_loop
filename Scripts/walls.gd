@@ -11,5 +11,5 @@ func _draw() -> void:
 		return
 	for cell in environment.get_wall_cells():
 		var rect: Rect2 = Rect2(cell - Vector2(HALF_SIZE, HALF_SIZE), Vector2(HALF_SIZE, HALF_SIZE) * 2.0)
-		draw_rect(rect, Color(0.20, 0.24, 0.32))
-		draw_rect(rect, Color(0.40, 0.48, 0.62), false, 2.0)
+		draw_rect(rect, Color(0.13, 0.19, 0.29))
+		draw_rect(rect, Color(0.36, 0.62, 0.82), false, 2.0)

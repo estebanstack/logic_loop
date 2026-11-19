@@ -16,17 +16,27 @@ extends Node2D
 @onready var tool_dispenser: Node2D   = get_node_or_null("ToolDispenser")
 
 # UI NODES EXISTENTES
-@onready var agent_status_label: Label     = get_node_or_null("UI/DebugPanel/Margin/VBox/StatusText")
-@onready var detection_banner: Label       = get_node_or_null("UI/DebugPanel/Margin/VBox/DetectionBanner")
+@onready var agent_status_label: Label     = get_node_or_null("UI/TopBar/HBox/BotChip/VBox/StatusText")
+@onready var bot_chip: PanelContainer      = get_node_or_null("UI/TopBar/HBox/BotChip")
+@onready var bot_state_label: Label        = get_node_or_null("UI/TopBar/HBox/BotChip/VBox/BotStateLabel")
+@onready var climate_chip: PanelContainer  = get_node_or_null("UI/TopBar/HBox/ClimateChip")
+@onready var climate_label: Label          = get_node_or_null("UI/TopBar/HBox/ClimateChip/VBox/ClimateLabel")
+@onready var tool_chip: PanelContainer     = get_node_or_null("UI/TopBar/HBox/ToolChip")
+@onready var tool_label: Label             = get_node_or_null("UI/TopBar/HBox/ToolChip/VBox/ToolLabel")
+@onready var banner_pill: PanelContainer   = get_node_or_null("UI/BannerPill")
+@onready var detection_banner: Label       = get_node_or_null("UI/BannerPill/DetectionBanner")
+@onready var modal_backdrop: ColorRect     = get_node_or_null("UI/ModalBackdrop")
 @onready var program_list: Label           = get_node_or_null("UI/ProgrammingPanel/Margin/VBox/ScrollList/ProgramList")
-@onready var feedback_label: Label         = get_node_or_null("UI/ProgrammingPanel/Margin/VBox/FeedbackText")
+@onready var program_scroll: ScrollContainer = get_node_or_null("UI/ProgrammingPanel/Margin/VBox/ScrollList")
+@onready var feedback_label: Label         = get_node_or_null("UI/FeedbackPanel/FeedbackText")
 @onready var game_over_modal: Control      = get_node_or_null("UI/GameOverModal")
 @onready var victory_modal: Control        = get_node_or_null("UI/VictoryModal")
 @onready var detection_timer: Timer        = get_node_or_null("UI/DetectionTimer")
 
 # NODES SISTEMAS DINÁMICOS Y EVENTOS DISCRETOS
-@onready var dynamics_status_label: Label  = get_node_or_null("UI/DynamicsPanel/Margin/VBox/DynamicsText")
-@onready var energy_bar: ProgressBar       = get_node_or_null("UI/DynamicsPanel/Margin/VBox/EnergyBar")
+@onready var dynamics_status_label: Label  = get_node_or_null("UI/TopBar/HBox/EnergyBox/DynamicsText")
+@onready var energy_bar: ProgressBar       = get_node_or_null("UI/TopBar/HBox/EnergyBox/EnergyRow/EnergyBar")
+@onready var energy_value_label: Label     = get_node_or_null("UI/TopBar/HBox/EnergyBox/EnergyRow/EnergyValue")
 @onready var queue_simulator: Control      = get_node_or_null("UI/QueueSimulator")
 
 # NUEVOS MOTORES MATEMÁTICOS Y PANEL AVANZADO
@@ -52,8 +62,8 @@ const BASE_VISION_RADIUS: float = 250.0
 # Rutas de patrulla en la estación espacial para el Bot de Mantenimiento
 @export var station_patrol_waypoints: Array[Vector2] = [
 	Vector2(200, 200),
-	Vector2(1080, 200),
-	Vector2(1080, 520),
+	Vector2(760, 200),     # pata derecha acortada (era x = 1080) para no pasar bajo el panel derecho
+	Vector2(760, 520),
 	Vector2(200, 520)
 ]
 
@@ -73,8 +83,8 @@ const GAP_Y: float = 536.0                        # Único hueco: permite el des
 const COVER_CELL: Vector2 = Vector2(406, 408)     # Casilla de cobertura (oeste de la barrera)
 const EXIT_CELL: Vector2 = Vector2(534, 408)      # Casilla de salida (este de la barrera)
 const CELL_TOL: float = 8.0
-const WALL_TOP_Y: float = 24.0                    # Primera casilla de muro dibujada (visual)
-const WALL_BOTTOM_Y: float = 664.0
+const WALL_TOP_Y: float = 88.0                    # Primera casilla de muro dibujada (visual): bajo la barra superior
+const WALL_BOTTOM_Y: float = 600.0                # Última casilla de muro dibujada (visual): sobre la barra inferior
 
 # Rutas que Spark recorre tras SONDEAR (se recorren paso a paso)
 const RAM_PATH: Array[Vector2] = [Vector2(470, 408), Vector2(534, 408)]               # 2 pasos
@@ -96,6 +106,33 @@ const COVER_PATROL: int = 2
 
 const BANNER_DEFAULT_COLOR: Color = Color(1, 0.85, 0.1, 1)
 
+# Paleta única de la interfaz (coincide con Assets/ui/theme.tres)
+const COLOR_GREEN: Color = Color(0.24, 0.86, 0.52)
+const COLOR_AMBER: Color = Color(1.0, 0.7, 0.28)
+const COLOR_RED: Color = Color(1.0, 0.36, 0.36)
+const COLOR_BLUE: Color = Color(0.35, 0.63, 1.0)
+const COLOR_DIM: Color = Color(0.55, 0.65, 0.76)
+const COLOR_PANEL: Color = Color(0.059, 0.09, 0.149)
+const COLOR_TEXT: Color = Color(0.96, 0.97, 1.0)
+
+# Marcadores de la lista del programa (✓ ejecutado, ▶ en curso, · pendiente)
+const MARK_DONE: String = "✓ "
+const MARK_NOW: String = "▶ "
+const MARK_TODO: String = "· "
+
+# Programa de demostración (--autodemo): dispensador -> cobertura -> SONDEAR -> reparación.
+# Spark parte de (150,600) mirando al este, pasos de 64 px:
+#   este 1 y norte 3 hasta (214,408) [38 px del dispensador], girar al este -> INTERACTUAR (4 veces: la cola puede estar vacía al llegar)
+#   -> este hasta la cobertura (406,408) -> SONDEAR (termina en la salida (534,408))
+#   -> 2 al este y 4 al norte hasta (662,152) [38 px del componente] -> INTERACTUAR
+const AUTODEMO_PROGRAM: Array[String] = [
+	"MOVE", "TURN_LEFT", "MOVE", "MOVE", "MOVE", "TURN_RIGHT",
+	"INTERACT", "INTERACT", "INTERACT", "INTERACT",
+	"MOVE", "MOVE", "MOVE", "SONDEAR",
+	"MOVE", "MOVE", "TURN_LEFT", "MOVE", "MOVE", "MOVE", "MOVE", "INTERACT"
+]
+const AUTODEMO_DELAY: float = 1.0
+
 var cover_triggered: bool = false                 # El encuentro se juega una vez por corrida
 var spark_hidden: bool = false                    # Spark camuflado: el bot no lo percibe
 var spark_hidden_time_left: float = 0.0
@@ -103,12 +140,44 @@ var _banner_tween: Tween = null
 var event_banner_lock_left: float = 0.0           # Mientras sea > 0, el Bot no pisa el banner de un evento
 var barrier_known_armored: bool = false           # Tras un rebote la pared es BLINDADA con certeza
 
+# Estado puramente visual de la interfaz (no interviene en ninguna regla del juego)
+var _modal_tween: Tween = null
+var _chip_keys: Dictionary = {}                   # chip -> clave de estilo vigente (evita recrearlo cada cuadro)
+var _energy_level: int = -1                       # 0 = verde, 1 = ámbar, 2 = rojo
+var _tool_shown: bool = false
+
 func _ready() -> void:
 	if game_over_modal: game_over_modal.visible = false
 	if victory_modal:   victory_modal.visible   = false
-	if detection_banner: detection_banner.visible = false
+	if banner_pill:     banner_pill.visible     = false
+	if modal_backdrop:  modal_backdrop.visible  = false
+
+	# El fondo oscuro y la animación de entrada de los modales se manejan en un solo lugar
+	for modal in [game_over_modal, victory_modal]:
+		if modal:
+			modal.visibility_changed.connect(_on_modal_visibility_changed.bind(modal))
 
 	_init_advanced_engines()
+	_init_hud()
+
+	if "--autodemo" in OS.get_cmdline_user_args():
+		_run_autodemo()
+
+# Estado inicial de los chips de la barra superior
+func _init_hud() -> void:
+	if markov_chain:
+		_set_climate_chip(markov_chain.current_state, markov_chain.get_current_state_name())
+	_set_bot_chip("PATRULLA", "Esperando ejecución del programa")
+	_set_tool_chip(false)
+
+# Demo para verificación y para grabar la entrega: carga un programa fijo y pulsa EJECUTAR
+func _run_autodemo() -> void:
+	await get_tree().create_timer(AUTODEMO_DELAY).timeout
+	if spark == null or not spark.has_method("add_command"):
+		return
+	for cmd in AUTODEMO_PROGRAM:
+		spark.add_command(cmd)
+	_on_btn_execute_pressed()
 
 func _init_advanced_engines() -> void:
 	# Respaldo dinámico si no estuvieran presentes en el árbol de escena
@@ -193,6 +262,11 @@ func get_environment_info() -> Dictionary:
 # BARRERA DAÑADA: BLOQUEO LÓGICO, DIAGNÓSTICO HMM Y ENCUENTRO EN COBERTURA
 # ==============================================================================
 func _process(delta: float) -> void:
+	# Chip de herramienta: refleja si Spark lleva una (solo lectura)
+	if spark:
+		var carrying: bool = spark.get("has_tool") == true
+		if carrying != _tool_shown:
+			_set_tool_chip(carrying)
 	# Bloqueo de banner de evento: cuenta regresiva
 	if event_banner_lock_left > 0.0:
 		event_banner_lock_left = maxf(0.0, event_banner_lock_left - delta)
@@ -250,7 +324,7 @@ func _set_spark_hidden(on: bool) -> void:
 # SONDEAR (lo llama Spark): solo válido en la casilla de cobertura mirando al este
 func run_obstacle_probe(spark_pos: Vector2, facing: int) -> String:
 	if facing != 0 or not _same_cell(spark_pos, COVER_CELL) or barrier == null or barrier.is_destroyed or obstacle_hmm == null:
-		_show_banner("[?] Sin obstáculo al frente", BANNER_DEFAULT_COLOR, 2.0, false, true)
+		_show_banner("Sin obstáculo al frente", BANNER_DEFAULT_COLOR, 2.0, false, true)
 		notify_execution_status("Sin obstáculo al frente")
 		return "NINGUNO"
 
@@ -280,7 +354,7 @@ func run_obstacle_probe(spark_pos: Vector2, facing: int) -> String:
 			# El rebote es evidencia directa: P(Blindado) = 1 para sondeos posteriores
 			barrier_known_armored = true
 			obstacle_hmm.current_belief = [0.0, 1.0]
-			_show_banner("[!] ¡BARRERA BLINDADA! Rebote", Color(1, 0.4, 0.2), 2.0, false, true)
+			_show_banner("¡BARRERA BLINDADA! Rebote", Color(1, 0.4, 0.2), 2.0, false, true)
 			# El estruendo delata a Spark aunque esté camuflado
 			_set_spark_hidden(false)
 			if maintenance_bot and maintenance_bot.has_method("force_chase"):
@@ -413,6 +487,7 @@ func check_interact(spark_pos: Vector2) -> void:
 func _on_markov_climate_changed(_old: int, new_state: int, state_name: String) -> void:
 	if not markov_chain:
 		return
+	_set_climate_chip(new_state, state_name)
 	
 	# Modifica la recarga solar de Spark según la radiación climática de Markov
 	var solar_mod: float = markov_chain.get_environmental_solar_modifier()
@@ -426,7 +501,7 @@ func _on_markov_climate_changed(_old: int, new_state: int, state_name: String) -
 		
 	if new_state == MarkovChain.State.CRITICAL:
 		notify_execution_status("¡ALERTA RADIOLÓGICA! Clima espacial: " + state_name)
-		_show_banner("[!] CLIMA ESPACIAL: TORMENTA DE RADIACIÓN", BANNER_DEFAULT_COLOR, 2.5, false, true)
+		_show_banner("CLIMA ESPACIAL: TORMENTA DE RADIACIÓN", BANNER_DEFAULT_COLOR, 2.5, false, true)
 
 # ==============================================================================
 # INTEGRACIÓN DEL PARADIGMA 6: TEORÍA DE JUEGOS EN EL JUEGO
@@ -499,38 +574,41 @@ func on_program_complete() -> void:
 func notify_spark_detected() -> void:
 	if event_banner_lock_left > 0.0:
 		return
-	_show_banner("[!] ¡SPARK DETECTADO!", BANNER_DEFAULT_COLOR, 2.0)
+	_show_banner("¡SPARK DETECTADO!", BANNER_DEFAULT_COLOR, 2.0)
 
 func notify_spark_lost() -> void:
 	if event_banner_lock_left > 0.0:
 		return
-	_show_banner("[?] SPARK PERDIDO — BUSCANDO...", BANNER_DEFAULT_COLOR, 2.0)
+	_show_banner("SPARK PERDIDO · BUSCANDO...", BANNER_DEFAULT_COLOR, 2.0)
 
 # Banner genérico (texto, color, duración); `flash` lo hace parpadear;
 # `priority` bloquea los avisos del Bot mientras dure el banner del evento
 func _show_banner(text: String, color: Color, duration: float, flash: bool = false, priority: bool = false) -> void:
 	if priority:
 		event_banner_lock_left = duration
-	if not detection_banner:
+	if not detection_banner or not banner_pill:
 		return
 	if _banner_tween and _banner_tween.is_valid():
 		_banner_tween.kill()
-	detection_banner.modulate.a = 1.0
+	banner_pill.modulate.a = 1.0
 	detection_banner.text = text
-	detection_banner.add_theme_color_override("font_color", color)
-	detection_banner.visible = true
+	# Texto claro siempre; el color del evento va en el borde y el relleno de la pastilla
+	detection_banner.add_theme_color_override("font_color", COLOR_TEXT)
+	_style_chip(banner_pill, color, 0.35, 14.0)
+	banner_pill.visible = true
+	banner_pill.reset_size.call_deferred()   # se ajusta a 1 o 2 líneas según el texto
 	if flash:
 		_banner_tween = create_tween().set_loops(int(duration / 0.5))
-		_banner_tween.tween_property(detection_banner, "modulate:a", 0.25, 0.25)
-		_banner_tween.tween_property(detection_banner, "modulate:a", 1.0, 0.25)
+		_banner_tween.tween_property(banner_pill, "modulate:a", 0.25, 0.25)
+		_banner_tween.tween_property(banner_pill, "modulate:a", 1.0, 0.25)
 	if detection_timer: detection_timer.start(duration)
 
 func _on_detection_timer_timeout() -> void:
 	if _banner_tween and _banner_tween.is_valid():
 		_banner_tween.kill()
-	if detection_banner:
-		detection_banner.modulate.a = 1.0
-		detection_banner.visible = false
+	if banner_pill:
+		banner_pill.modulate.a = 1.0
+		banner_pill.visible = false
 
 # CONTROL DE SIMULACIÓN
 func start_simulation() -> void:
@@ -593,6 +671,9 @@ func _on_btn_retry_pressed() -> void:
 	reset_simulation()
 	notify_execution_status("Listo para programar")
 
+func _on_btn_menu_pressed() -> void:
+	get_tree().change_scene_to_file("res://Scenes/title.tscn")
+
 func _on_btn_replay_pressed() -> void:
 	if victory_modal: victory_modal.visible = false
 	is_level_completed = false
@@ -607,7 +688,7 @@ func update_program_sequence_ui(commands: Array, current_idx: int, executing: bo
 	if not program_list:
 		return
 	if commands.size() == 0:
-		program_list.text = "[ Vacío — añade comandos ]"
+		program_list.text = "Programa vacío: añade comandos"
 		return
 
 	var lines: String = ""
@@ -616,35 +697,130 @@ func update_program_sequence_ui(commands: Array, current_idx: int, executing: bo
 		var prefix: String
 		if executing:
 			if i < current_idx - 1:
-				prefix = "[X] "      # ejecutado
+				prefix = MARK_DONE   # ejecutado
 			elif i == current_idx - 1:
-				prefix = "[>] "      # ejecutándose
+				prefix = MARK_NOW    # ejecutándose
 			else:
-				prefix = "[ ] "      # pendiente
+				prefix = MARK_TODO   # pendiente
 		else:
-			prefix = "[ ] "
+			prefix = MARK_TODO
 		lines += prefix + label + "\n"
 	program_list.text = lines.strip_edges()
+	# Mantiene a la vista la línea en curso mientras se ejecuta (solo visual)
+	if executing and program_scroll:
+		var line_h: float = program_list.get_line_height() + program_list.get_theme_constant("line_spacing")
+		program_scroll.scroll_vertical = int(maxf(0.0, float(current_idx - 3)) * line_h)
 
 func notify_execution_status(msg: String) -> void:
 	if feedback_label:
-		feedback_label.text = "ESTADO: " + msg
+		feedback_label.text = msg
 
-func update_debug_ui(state_str: String, target_str: String, distance_str: String, action_str: String, vision_radius: float) -> void:
-	if agent_status_label:
-		agent_status_label.text = (
-			"Estado:    %s\nObjetivo:  %s\nDistancia: %s\nAcción:    %s\nVisión:    %d px"
-			% [state_str, target_str, distance_str, action_str, int(vision_radius)]
-		)
+func update_debug_ui(state_str: String, _target_str: String, distance_str: String, action_str: String, _vision_radius: float) -> void:
+	var detail: String = _sentence_case(action_str)
+	if distance_str != "N/A":
+		detail += " · " + distance_str
+	var chip_text: String = state_str + " · IA bayesiana" if state_str == "BUSCAR" else state_str
+	_set_bot_chip(chip_text, detail, state_str)
 
 func update_dynamics_ui(energy: float, max_energy: float, net_rate: float, inflow: float, outflow: float) -> void:
+	var percent: float = (energy / max_energy) * 100.0
 	if energy_bar:
-		energy_bar.value = (energy / max_energy) * 100.0
+		energy_bar.value = percent
+		_set_energy_level(0 if percent > 50.0 else (1 if percent > 25.0 else 2))
+	if energy_value_label:
+		energy_value_label.text = "ENERGÍA %d%%" % int(round(percent))
 	if dynamics_status_label:
-		dynamics_status_label.text = (
-			"Stock (Energía): %.1f %%\nInflow (Solar):   +%.1f %%/s\nOutflow (Base):   -%.1f %%/s\nTasa Neta dE/dt:  %+.1f %%/s\nBucle: Balance continuo"
-			% [energy, inflow, outflow, net_rate]
-		)
+		dynamics_status_label.text = "Solar +%.1f/s · Consumo −%.1f/s · Neto %+.1f/s" % [inflow, outflow, net_rate]
+
+# ==============================================================================
+# AYUDAS VISUALES DE LA INTERFAZ (no tocan la lógica del juego)
+# ==============================================================================
+# Estilo de chip/pastilla: fondo tintado, borde del color indicado
+func _style_chip(panel: PanelContainer, color: Color, fill_alpha: float = 0.16, margin_x: float = 8.0) -> void:
+	var box: StyleBoxFlat = StyleBoxFlat.new()
+	box.bg_color = COLOR_PANEL.lerp(color, fill_alpha)   # opaco: legible sobre cualquier fondo
+	box.border_color = color
+	box.set_border_width_all(1)
+	box.set_corner_radius_all(8)
+	box.content_margin_left = margin_x
+	box.content_margin_right = margin_x
+	box.content_margin_top = 3.0
+	box.content_margin_bottom = 3.0
+	panel.add_theme_stylebox_override("panel", box)
+
+# Aplica el estilo solo cuando cambia el color (update_debug_ui se llama cada cuadro)
+func _style_chip_once(panel: PanelContainer, color: Color) -> void:
+	if _chip_keys.get(panel) == color:
+		return
+	_chip_keys[panel] = color
+	_style_chip(panel, color)
+
+func _set_climate_chip(state_idx: int, state_name: String) -> void:
+	if not climate_chip or not climate_label:
+		return
+	var color: Color = COLOR_GREEN if state_idx == MarkovChain.State.STABLE else (COLOR_AMBER if state_idx == MarkovChain.State.FLUCTUATING else COLOR_RED)
+	climate_label.text = state_name
+	climate_label.add_theme_color_override("font_color", color)
+	_style_chip_once(climate_chip, color)
+
+func _set_bot_chip(text: String, detail: String, state_key: String = "PATRULLA") -> void:
+	if not bot_chip or not bot_state_label:
+		return
+	var color: Color = COLOR_BLUE
+	if state_key == "PERSEGUIR":
+		color = COLOR_RED
+	elif state_key == "BUSCAR":
+		color = COLOR_AMBER
+	bot_state_label.text = text
+	bot_state_label.add_theme_color_override("font_color", color)
+	if agent_status_label:
+		agent_status_label.text = detail
+	_style_chip_once(bot_chip, color)
+
+func _set_tool_chip(carrying: bool) -> void:
+	_tool_shown = carrying
+	if not tool_chip or not tool_label:
+		return
+	tool_label.text = "EN MANO" if carrying else "NINGUNA"
+	var color: Color = COLOR_AMBER if carrying else COLOR_DIM
+	tool_label.add_theme_color_override("font_color", color)
+	_style_chip_once(tool_chip, color)
+
+# Relleno de la barra de energía según el nivel (verde / ámbar / rojo)
+func _set_energy_level(level: int) -> void:
+	if level == _energy_level or not energy_bar:
+		return
+	_energy_level = level
+	var box: StyleBoxFlat = StyleBoxFlat.new()
+	box.bg_color = [COLOR_GREEN, COLOR_AMBER, COLOR_RED][level]
+	box.set_corner_radius_all(4)
+	energy_bar.add_theme_stylebox_override("fill", box)
+
+# "ESPERANDO EJECUCIÓN" -> "Esperando ejecución" (los textos con ¡ se dejan como están)
+func _sentence_case(text: String) -> String:
+	if text.begins_with("¡") or text.length() < 2:
+		return text
+	return (text.substr(0, 1) + text.substr(1).to_lower()).replace("spark", "Spark").replace("(ia ", "(IA ")
+
+# Fondo oscuro + entrada suave (fundido y escala, 0.2 s) de los modales
+func _on_modal_visibility_changed(modal: Control) -> void:
+	var any_visible: bool = (game_over_modal != null and game_over_modal.visible) or (victory_modal != null and victory_modal.visible)
+	if modal_backdrop:
+		modal_backdrop.visible = any_visible
+	if not modal.visible:
+		return
+	if _modal_tween and _modal_tween.is_valid():
+		_modal_tween.kill()
+	modal.pivot_offset = modal.size / 2.0
+	modal.modulate.a = 0.0
+	modal.scale = Vector2(0.9, 0.9)
+	if modal_backdrop:
+		modal_backdrop.modulate.a = 0.0
+	_modal_tween = create_tween().set_parallel(true)
+	_modal_tween.tween_property(modal, "modulate:a", 1.0, 0.2)
+	_modal_tween.tween_property(modal, "scale", Vector2.ONE, 0.2).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	if modal_backdrop:
+		_modal_tween.tween_property(modal_backdrop, "modulate:a", 1.0, 0.2)
 
 func _cmd_label(cmd: String) -> String:
 	match cmd:

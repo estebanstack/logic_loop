@@ -11,7 +11,7 @@ config_version=5
 [application]
 
 config/name="Logic_Loop"
-run/main_scene="res://Scenes/main.tscn"
+run/main_scene="res://Scenes/title.tscn"
 config/features=PackedStringArray("4.7", "Forward Plus")
 config/icon="res://icon.svg"
 
@@ -21,10 +21,15 @@ window/size/viewport_width=1280
 window/size/viewport_height=720
 window/stretch/mode="canvas_items"
 
+[gui]
+
+theme/custom="res://Assets/ui/theme.tres"
+
 [physics]
 
 3d/physics_engine="Jolt Physics"
 
 [rendering]
 
+environment/defaults/default_clear_color=Color(0.027, 0.043, 0.078, 1)
 rendering_device/driver.windows="d3d12"

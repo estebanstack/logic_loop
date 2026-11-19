@@ -28,15 +28,15 @@ func _exp_sample(rate: float) -> float:
 	return -log(1.0 - randf()) / rate
 
 func _find_conveyor_belt() -> HBoxContainer:
-	if has_node("Margin/VBox/ConveyorBelt"):
-		return get_node("Margin/VBox/ConveyorBelt") as HBoxContainer
+	if has_node("Margin/HBox/ConveyorBelt"):
+		return get_node("Margin/HBox/ConveyorBelt") as HBoxContainer
 	if has_node("ConveyorBelt"):
 		return get_node("ConveyorBelt") as HBoxContainer
 	return null
 
 func _find_status_label() -> Label:
-	if has_node("Margin/VBox/StatusLabel"):
-		return get_node("Margin/VBox/StatusLabel") as Label
+	if has_node("Margin/HBox/Info/StatusLabel"):
+		return get_node("Margin/HBox/Info/StatusLabel") as Label
 	if has_node("StatusLabel"):
 		return get_node("StatusLabel") as Label
 	return null
@@ -74,13 +74,13 @@ func _on_arrival_timer_timeout() -> void:
 		if crate_texture:
 			var tex_rect = TextureRect.new()
 			tex_rect.texture = crate_texture
-			tex_rect.custom_minimum_size = Vector2(36, 36)
+			tex_rect.custom_minimum_size = Vector2(28, 28)
 			tex_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 			tex_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 			item = tex_rect
 		else:
 			var new_box = ColorRect.new()
-			new_box.custom_minimum_size = Vector2(36, 36)
+			new_box.custom_minimum_size = Vector2(28, 28)
 			new_box.color = Color(0.9, 0.5, 0.1)
 			item = new_box
 		
@@ -90,7 +90,7 @@ func _on_arrival_timer_timeout() -> void:
 		update_ui()
 	else:
 		if status_label:
-			status_label.text = "Cola llena: buffer saturado (%d/%d)" % [queue_array.size(), max_capacity]
+			status_label.text = "Cola llena: saturada (%d/%d)" % [queue_array.size(), max_capacity]
 			status_label.modulate = Color(1.0, 0.3, 0.3)
 
 # EVENTO DISCRETO 2: SERVICIO / DESPACHO DE HERRAMIENTA
@@ -135,6 +135,6 @@ func update_ui() -> void:
 	if not status_label:
 		return
 	status_label.modulate = Color(1, 1, 1)
-	status_label.text = "Cola de Herramientas: %d / %d | Llegadas: %d | Servidas: %d" % [
+	status_label.text = "Cola %d/%d · Llegadas %d · Servidas %d" % [
 		queue_array.size(), max_capacity, total_arrivals, total_served
 	]
